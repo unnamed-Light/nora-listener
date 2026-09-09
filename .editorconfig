@@ -1,0 +1,31 @@
+# EditorConfig is awesome: https://EditorConfig.org
+
+# Top-most EditorConfig file
+root = true
+
+# Default rules for all files
+[*]
+charset = utf-8
+end_of_line = lf
+indent_style = space
+indent_size = 2
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+# Rust source files (official Rust style standard uses 4 spaces)
+[*.rs]
+indent_style = space
+indent_size = 4
+
+# Cargo / TOML files
+[*.toml]
+indent_style = space
+indent_size = 2
+
+# Markdown
+[*.md]
+trim_trailing_whitespace = false
+
+# Windows Batch scripts
+[*.{bat,cmd}]
+end_of_line = crlf
