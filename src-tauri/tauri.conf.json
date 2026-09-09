@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "Nora Listener",
-  "version": "1.0.0",
+  "version": "1.0.0-hotfix1",
   "identifier": "com.noralistener.desktop",
   "build": {
     "frontendDist": "../dist",
