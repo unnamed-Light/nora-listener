@@ -1347,7 +1347,35 @@ function App() {
             <Button appearance="primary" icon={<Play24Regular />} onClick={handleTranscribe} disabled={isTranscribing || !selectedFilePath} style={{ flexShrink: 0 }}>
               {isTranscribing ? t.transcribing : t.transcribeBtn}
             </Button>
-            
+            <div 
+              style={{ 
+                display: 'inline-flex', 
+                alignItems: 'center', 
+                backgroundColor: tokens.colorNeutralBackground3, 
+                borderRadius: tokens.borderRadiusMedium, 
+                padding: '2px', 
+                gap: '2px',
+                border: `1px solid ${tokens.colorNeutralStroke2}`,
+                flexShrink: 0
+              }}
+            >
+              <Button 
+                size="small" 
+                appearance={recognitionMode === 'accuracy' ? 'primary' : 'subtle'}
+                onClick={() => setRecognitionMode('accuracy')}
+                title={t.accuracyModeTooltip}
+              >
+                {t.accuracyMode}
+              </Button>
+              <Button 
+                size="small" 
+                appearance={recognitionMode === 'speed' ? 'primary' : 'subtle'}
+                onClick={() => setRecognitionMode('speed')}
+                title={t.speedModeTooltip}
+              >
+                {t.speedMode}
+              </Button>
+            </div>
             {isTranscribing && <div className={styles.progressContainer}><ProgressBar value={progress} /></div>}
           </div>
 
@@ -1407,34 +1435,6 @@ function App() {
               >
                 {t.showTeacherQuotes}
               </ToggleButton>
-              <div 
-                style={{ 
-                  display: 'inline-flex', 
-                  alignItems: 'center', 
-                  backgroundColor: tokens.colorNeutralBackground3, 
-                  borderRadius: tokens.borderRadiusMedium, 
-                  padding: '2px', 
-                  gap: '2px',
-                  border: `1px solid ${tokens.colorNeutralStroke2}` 
-                }}
-              >
-                <Button 
-                  size="small" 
-                  appearance={recognitionMode === 'accuracy' ? 'primary' : 'subtle'}
-                  onClick={() => setRecognitionMode('accuracy')}
-                  title={t.accuracyModeTooltip}
-                >
-                  {t.accuracyMode}
-                </Button>
-                <Button 
-                  size="small" 
-                  appearance={recognitionMode === 'speed' ? 'primary' : 'subtle'}
-                  onClick={() => setRecognitionMode('speed')}
-                  title={t.speedModeTooltip}
-                >
-                  {t.speedMode}
-                </Button>
-              </div>
               <Button 
                 appearance="primary" 
                 icon={isSummarizing ? <Spinner size="tiny" /> : <Sparkle24Regular />} 

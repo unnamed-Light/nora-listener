@@ -15,20 +15,34 @@ import { openExternalUrl } from '../lib/openUrl';
 
 const useStyles = makeStyles({
   surface: {
-    maxWidth: '640px',
+    maxWidth: '560px',
     width: '92%',
-    maxHeight: '85vh',
+    maxHeight: '82vh',
+    height: 'auto',
     display: 'flex',
     flexDirection: 'column',
     ...shorthands.borderRadius(tokens.borderRadiusLarge),
     backgroundColor: tokens.colorNeutralBackground1,
+    overflow: 'hidden',
+    boxSizing: 'border-box',
+    ...shorthands.padding('20px', '24px', '16px', '24px'),
+  },
+  dialogBody: {
+    display: 'flex',
+    flexDirection: 'column',
+    height: '100%',
+    maxHeight: '100%',
+    minHeight: 0,
+    overflow: 'hidden',
+    flexGrow: 1,
   },
   header: {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingBottom: '12px',
+    paddingBottom: '10px',
     borderBottom: `1px solid ${tokens.colorNeutralStroke1}`,
+    flexShrink: 0,
   },
   titleGroup: {
     display: 'flex',
@@ -40,13 +54,22 @@ const useStyles = makeStyles({
     flexDirection: 'column',
     ...shorthands.gap('2px'),
   },
+  tabList: {
+    marginBottom: '6px',
+    flexShrink: 0,
+  },
   content: {
     display: 'flex',
     flexDirection: 'column',
     ...shorthands.gap('16px'),
-    paddingTop: '12px',
-    paddingBottom: '12px',
+    paddingTop: '8px',
+    paddingBottom: '16px',
+    paddingRight: '6px',
     overflowY: 'auto',
+    minHeight: 0,
+    flexGrow: 1,
+    flexShrink: 1,
+    boxSizing: 'border-box',
   },
   section: {
     display: 'flex',
@@ -119,6 +142,7 @@ const useStyles = makeStyles({
     justifyContent: 'flex-end',
     paddingTop: '12px',
     borderTop: `1px solid ${tokens.colorNeutralStroke1}`,
+    flexShrink: 0,
   },
 });
 
@@ -166,7 +190,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, l
   return (
     <Dialog open={isOpen} onOpenChange={(_, data) => !data.open && onClose()}>
       <DialogSurface className={styles.surface}>
-        <DialogBody style={{ display: 'flex', flexDirection: 'column', maxHeight: '100%' }}>
+        <DialogBody className={styles.dialogBody}>
           {/* Header */}
           <div className={styles.header}>
             <div className={styles.titleGroup}>
@@ -189,19 +213,18 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, l
           </div>
 
           {/* Tab Navigation */}
-          <div style={{ marginTop: '8px', borderBottom: `1px solid ${tokens.colorNeutralStroke2}` }}>
-            <TabList
-              selectedValue={activeTab}
-              onTabSelect={(_, data) => setActiveTab(data.value as 'general' | 'prompt')}
-            >
-              <Tab value="general" icon={<Settings24Regular style={{ fontSize: '16px' }} />}>
-                {isRu ? 'Основные' : 'General'}
-              </Tab>
-              <Tab value="prompt" icon={<Sparkle20Regular style={{ fontSize: '16px' }} />}>
-                {isRu ? 'Промпт Норы' : "Nora's Prompt"}
-              </Tab>
-            </TabList>
-          </div>
+          <TabList
+            className={styles.tabList}
+            selectedValue={activeTab}
+            onTabSelect={(_, data) => setActiveTab(data.value as 'general' | 'prompt')}
+          >
+            <Tab value="general" icon={<Settings24Regular style={{ fontSize: '16px' }} />}>
+              {isRu ? 'Основные' : 'General'}
+            </Tab>
+            <Tab value="prompt" icon={<Sparkle20Regular style={{ fontSize: '16px' }} />}>
+              {isRu ? 'Промпт Норы' : "Nora's Prompt"}
+            </Tab>
+          </TabList>
 
           {/* Content */}
           <DialogContent className={styles.content}>
