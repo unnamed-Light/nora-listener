@@ -1022,14 +1022,7 @@ const TranscriptionItemRow: React.FC<{
       }`}
       style={{ marginLeft: `${level * 12}px` }}
     >
-      <div className={styles.itemMain}>
-        <span
-          className={styles.dragHandle}
-          title={language === 'ru' ? 'Перетащить лекцию' : 'Drag lecture'}
-          onPointerDown={onPointerDown}
-        >
-          <ArrowMove20Regular style={{ fontSize: '14px' }} />
-        </span>
+      <div className={styles.itemMain} onPointerDown={onPointerDown}>
         <DocumentBulletList20Regular style={{ color: tokens.colorNeutralForeground3, flexShrink: 0 }} />
         <span className={styles.itemTitle} title={item.title}>
           {item.title}
@@ -1144,14 +1137,7 @@ const FolderItemRow: React.FC<{
         isDragOver || isHoverTarget ? styles.folderRowDragOver : ''
       }`}
     >
-      <div className={styles.folderMain}>
-        <span
-          className={styles.dragHandle}
-          title="Перетащить папку"
-          onPointerDown={onPointerDown}
-        >
-          <ArrowMove20Regular style={{ fontSize: '14px' }} />
-        </span>
+      <div className={styles.folderMain} onPointerDown={onPointerDown}>
         {isExpanded ? (
           <ChevronDown16Regular style={{ flexShrink: 0, color: tokens.colorNeutralForeground3 }} />
         ) : (

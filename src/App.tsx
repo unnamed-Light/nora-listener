@@ -6,7 +6,8 @@ import {
   makeStyles, shorthands, Button, ToggleButton, ProgressBar, tokens,
   Title2, Subtitle2, Body1, Body1Strong, Divider, Select,
   TabList, Tab, Switch, Input, Spinner, Badge,
-  Dialog, DialogSurface, DialogBody, DialogTitle, DialogContent, DialogActions
+  Dialog, DialogSurface, DialogBody, DialogTitle, DialogContent, DialogActions,
+  Menu, MenuTrigger, MenuPopover, MenuList, MenuItem
 } from '@fluentui/react-components';
 import {
   DocumentArrowUp24Regular, Play24Regular, Sparkle24Regular, Sparkle20Regular,
@@ -31,6 +32,9 @@ import { highlightHtmlMatches, countMatches, escapeRegex } from './lib/searchUti
 import { renderMarkdownWithMath } from './lib/mathRenderer';
 import { UserGuideModal } from './components/UserGuideModal';
 import { SettingsModal } from './components/SettingsModal';
+import { ContextPanel } from './components/ContextPanel';
+import { formatContextForPrompt } from './lib/contextExtractor';
+import type { ContextItem } from './lib/contextExtractor';
 
 interface NativeAudioDevice {
   id: string;
@@ -443,6 +447,9 @@ const translations = {
     cancel: 'Отмена',
     showTeacherQuotes: 'Показывать цитаты преподавателя',
     showTeacherQuotesTooltip: 'Включать в конспект аутентичные грамматически исправленные цитаты лектора',
+    exportSummaryOnly: 'Только конспект',
+    exportTranscriptOnly: 'Только транскрипт',
+    exportBoth: 'Объединенный файл (Конспект + Транскрипт)',
     accuracyMode: 'Повышенная точность',
     accuracyModeTooltip: 'Модель Whisper Large v3 (1.55 млрд параметров): максимальная академическая точность',
     speedMode: 'Повышенная скорость',
@@ -489,6 +496,9 @@ const translations = {
     cancel: 'Cancel',
     showTeacherQuotes: 'Show Lecturer Quotes',
     showTeacherQuotesTooltip: 'Include authentic, grammatically corrected quotes from the lecturer in notes',
+    exportSummaryOnly: 'Notes only',
+    exportTranscriptOnly: 'Transcript only',
+    exportBoth: 'Combined file (Notes + Transcript)',
     accuracyMode: 'Higher Accuracy',
     accuracyModeTooltip: 'Whisper Large v3 (1.55B params): maximum academic accuracy',
     speedMode: 'Higher Speed',
@@ -528,6 +538,7 @@ function App() {
   const [summaryViewMode, setSummaryViewMode] = useState<'preview' | 'edit'>('preview');
   const [isSummarizing, setIsSummarizing] = useState(false);
   const [showTeacherQuotes, setShowTeacherQuotes] = useState(false);
+  const [contextItems, setContextItems] = useState<ContextItem[]>([]);
   const [isGuideOpen, setIsGuideOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   
@@ -779,6 +790,7 @@ function App() {
     setSelectedFileName(null);
     setTranscription('');
     setSummary('');
+    setContextItems([]);
     setProgress(0);
     setActiveTab('transcript');
     setSummaryViewMode('preview');
@@ -884,7 +896,9 @@ function App() {
     console.log(`[${startSummaryTime}] [Конспект] Запрос к Groq LLM для анализа лекции${showTeacherQuotes ? ' (с цитатами преподавателя)' : ''}...`);
 
     try {
-      const generated = await generateSummary(currentText, apiKey, showTeacherQuotes);
+      const { customPrompt } = useAppStore.getState();
+      const contextString = formatContextForPrompt(contextItems);
+      const generated = await generateSummary(currentText, apiKey, showTeacherQuotes, customPrompt, contextString);
       const cleanSummary = sanitizeEmojis(generated);
       setSummary(cleanSummary);
       setActiveTab('summary');
@@ -903,11 +917,21 @@ function App() {
     }
   };
 
-  const handleExportMd = async () => {
-    const textToExport = activeTab === 'summary' ? summary : activeTab === 'split' ? (summary ? `${summary}\n\n---\n\n# Полный транскрипт\n\n${transcription}` : transcription) : transcription;
+  const handleExportMd = async (scope?: 'summary' | 'transcript' | 'both') => {
+    let textToExport = '';
+    let suffix = '';
+    if (scope === 'summary' || (!scope && activeTab === 'summary')) {
+      textToExport = summary;
+      suffix = '_Конспект';
+    } else if (scope === 'transcript' || (!scope && activeTab === 'transcript')) {
+      textToExport = transcription;
+      suffix = '_Транскрипт';
+    } else {
+      textToExport = summary ? `${summary}\n\n---\n\n# Полный транскрипт\n\n${transcription}` : transcription;
+      suffix = '_Конспект_и_Транскрипт';
+    }
     if (!textToExport) return;
     const baseName = selectedFileName?.replace(/\.[^/.]+$/, '') || 'Lecture';
-    const suffix = activeTab === 'summary' ? '_Конспект' : activeTab === 'split' ? '_Конспект_и_Транскрипт' : '_Транскрипт';
     const defaultDir = lastSaveDirectory || (selectedFilePath ? selectedFilePath.replace(/[\\/][^\\/]+$/, '') : undefined);
 
     try {
@@ -925,11 +949,21 @@ function App() {
     }
   };
 
-  const handleExportDocx = async () => {
-    const textToExport = activeTab === 'summary' ? summary : activeTab === 'split' ? (summary ? `${summary}\n\n---\n\nПолный транскрипт:\n\n${transcription}` : transcription) : transcription;
+  const handleExportDocx = async (scope?: 'summary' | 'transcript' | 'both') => {
+    let textToExport = '';
+    let suffix = '';
+    if (scope === 'summary' || (!scope && activeTab === 'summary')) {
+      textToExport = summary;
+      suffix = ' (Конспект)';
+    } else if (scope === 'transcript' || (!scope && activeTab === 'transcript')) {
+      textToExport = transcription;
+      suffix = ' (Транскрипт)';
+    } else {
+      textToExport = summary ? `${summary}\n\n---\n\nПолный транскрипт:\n\n${transcription}` : transcription;
+      suffix = ' (Конспект и Транскрипт)';
+    }
     if (!textToExport) return;
     const baseName = selectedFileName?.replace(/\.[^/.]+$/, '') || 'Lecture';
-    const suffix = activeTab === 'summary' ? ' (Конспект)' : activeTab === 'split' ? ' (Конспект и Транскрипт)' : ' (Транскрипт)';
     const defaultDir = lastSaveDirectory || (selectedFilePath ? selectedFilePath.replace(/[\\/][^\\/]+$/, '') : undefined);
 
     try {
@@ -947,11 +981,21 @@ function App() {
     }
   };
 
-  const handleExportPdf = async () => {
-    const textToExport = activeTab === 'summary' ? summary : activeTab === 'split' ? (summary ? `${summary}\n\n---\n\nПолный транскрипт:\n\n${transcription}` : transcription) : transcription;
+  const handleExportPdf = async (scope?: 'summary' | 'transcript' | 'both') => {
+    let textToExport = '';
+    let suffix = '';
+    if (scope === 'summary' || (!scope && activeTab === 'summary')) {
+      textToExport = summary;
+      suffix = ' (Конспект)';
+    } else if (scope === 'transcript' || (!scope && activeTab === 'transcript')) {
+      textToExport = transcription;
+      suffix = ' (Транскрипт)';
+    } else {
+      textToExport = summary ? `${summary}\n\n---\n\nПолный транскрипт:\n\n${transcription}` : transcription;
+      suffix = ' (Конспект и Транскрипт)';
+    }
     if (!textToExport) return;
     const baseName = selectedFileName?.replace(/\.[^/.]+$/, '') || 'Lecture';
-    const suffix = activeTab === 'summary' ? ' (Конспект)' : activeTab === 'split' ? ' (Конспект и Транскрипт)' : ' (Транскрипт)';
     const defaultDir = lastSaveDirectory || (selectedFilePath ? selectedFilePath.replace(/[\\/][^\\/]+$/, '') : undefined);
 
     try {
@@ -1303,8 +1347,16 @@ function App() {
             <Button appearance="primary" icon={<Play24Regular />} onClick={handleTranscribe} disabled={isTranscribing || !selectedFilePath} style={{ flexShrink: 0 }}>
               {isTranscribing ? t.transcribing : t.transcribeBtn}
             </Button>
+            
             {isTranscribing && <div className={styles.progressContainer}><ProgressBar value={progress} /></div>}
           </div>
+
+          <ContextPanel 
+            contextItems={contextItems}
+            onAddItems={(newItems) => setContextItems(prev => [...prev, ...newItems])}
+            onRemoveItem={(id) => setContextItems(prev => prev.filter(item => item.id !== id))}
+            language={language}
+          />
 
           <div className={styles.tabRow}>
             <TabList selectedValue={activeTab} onTabSelect={(_, data) => setActiveTab(data.value as any)}>
@@ -1327,7 +1379,7 @@ function App() {
             </TabList>
 
             <div className={styles.tabActions}>
-              {(activeTab === 'summary' || activeTab === 'split') && (
+              {activeTab === 'summary' && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginRight: '6px' }}>
                   <Button 
                     size="small" 
@@ -1391,27 +1443,105 @@ function App() {
               >
                 {isSummarizing ? t.summarizing : t.smartNotes}
               </Button>
-              <Button 
-                icon={<Save24Regular />} 
-                onClick={handleExportMd} 
-                disabled={!(summary || transcription)}
-              >
-                {t.exportMd}
-              </Button>
-              <Button 
-                icon={<ArrowDownload24Regular />}
-                onClick={handleExportDocx} 
-                disabled={!(summary || transcription)}
-              >
-                {t.exportWord}
-              </Button>
-              <Button 
-                icon={<ArrowDownload24Regular />}
-                onClick={handleExportPdf} 
-                disabled={!(summary || transcription)}
-              >
-                {t.exportPdf}
-              </Button>
+              {activeTab === 'split' ? (
+                <>
+                  <Menu openOnHover positioning="below-end">
+                    <MenuTrigger disableButtonEnhancement>
+                      <Button 
+                        icon={<Save24Regular />} 
+                        disabled={!(summary || transcription)}
+                      >
+                        {t.exportMd}
+                      </Button>
+                    </MenuTrigger>
+                    <MenuPopover>
+                      <MenuList>
+                        <MenuItem onClick={() => handleExportMd('summary')} disabled={!summary}>
+                          {t.exportSummaryOnly}
+                        </MenuItem>
+                        <MenuItem onClick={() => handleExportMd('transcript')} disabled={!transcription}>
+                          {t.exportTranscriptOnly}
+                        </MenuItem>
+                        <MenuItem onClick={() => handleExportMd('both')} disabled={!(summary || transcription)}>
+                          {t.exportBoth}
+                        </MenuItem>
+                      </MenuList>
+                    </MenuPopover>
+                  </Menu>
+
+                  <Menu openOnHover positioning="below-end">
+                    <MenuTrigger disableButtonEnhancement>
+                      <Button 
+                        icon={<ArrowDownload24Regular />}
+                        disabled={!(summary || transcription)}
+                      >
+                        {t.exportWord}
+                      </Button>
+                    </MenuTrigger>
+                    <MenuPopover>
+                      <MenuList>
+                        <MenuItem onClick={() => handleExportDocx('summary')} disabled={!summary}>
+                          {t.exportSummaryOnly}
+                        </MenuItem>
+                        <MenuItem onClick={() => handleExportDocx('transcript')} disabled={!transcription}>
+                          {t.exportTranscriptOnly}
+                        </MenuItem>
+                        <MenuItem onClick={() => handleExportDocx('both')} disabled={!(summary || transcription)}>
+                          {t.exportBoth}
+                        </MenuItem>
+                      </MenuList>
+                    </MenuPopover>
+                  </Menu>
+
+                  <Menu openOnHover positioning="below-end">
+                    <MenuTrigger disableButtonEnhancement>
+                      <Button 
+                        icon={<ArrowDownload24Regular />}
+                        disabled={!(summary || transcription)}
+                      >
+                        {t.exportPdf}
+                      </Button>
+                    </MenuTrigger>
+                    <MenuPopover>
+                      <MenuList>
+                        <MenuItem onClick={() => handleExportPdf('summary')} disabled={!summary}>
+                          {t.exportSummaryOnly}
+                        </MenuItem>
+                        <MenuItem onClick={() => handleExportPdf('transcript')} disabled={!transcription}>
+                          {t.exportTranscriptOnly}
+                        </MenuItem>
+                        <MenuItem onClick={() => handleExportPdf('both')} disabled={!(summary || transcription)}>
+                          {t.exportBoth}
+                        </MenuItem>
+                      </MenuList>
+                    </MenuPopover>
+                  </Menu>
+                </>
+              ) : (
+                <>
+                  <Button 
+                    icon={<Save24Regular />} 
+                    onClick={() => handleExportMd()} 
+                    disabled={!(summary || transcription)}
+                  >
+                    {t.exportMd}
+                  </Button>
+                  <Button 
+                    icon={<ArrowDownload24Regular />}
+                    onClick={() => handleExportDocx()} 
+                    disabled={!(summary || transcription)}
+                  >
+                    {t.exportWord}
+                  </Button>
+                  <Button 
+                    icon={<ArrowDownload24Regular />}
+                    onClick={() => handleExportPdf()} 
+                    disabled={!(summary || transcription)}
+                  >
+                    {t.exportPdf}
+                  </Button>
+                </>
+              )}
             </div>
           </div>
 

@@ -49,13 +49,20 @@ async fn start_transcription(
 }
 
 #[tauri::command]
-async fn generate_summary(app: tauri::AppHandle, text: String, api_key: String, include_quotes: Option<bool>) -> Result<String, String> {
+async fn generate_summary(
+    app: tauri::AppHandle,
+    text: String,
+    api_key: String,
+    include_quotes: Option<bool>,
+    custom_prompt: Option<String>,
+    context_text: Option<String>,
+) -> Result<String, String> {
     if api_key.trim().is_empty() {
         return Err("Для генерации умного конспекта укажите Groq API ключ (gsk_...)".to_string());
     }
     let quotes = include_quotes.unwrap_or(false);
     let result = tauri::async_runtime::spawn_blocking(move || {
-        cloud_api::summarize_text(&text, &api_key, quotes, Some(&app))
+        cloud_api::summarize_text(&text, &api_key, quotes, custom_prompt.as_deref(), context_text.as_deref(), Some(&app))
     }).await.map_err(|e| e.to_string())?;
 
     result.map_err(|e| e.to_string())

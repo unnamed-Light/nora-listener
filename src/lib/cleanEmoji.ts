@@ -1,16 +1,16 @@
 const EMOJI_REPLACEMENTS: [RegExp, string][] = [
-  [/📌/g, '§'],
-  [/🔑/g, '•'],
-  [/📖/g, '§'],
-  [/⚠️/g, '[!]'],
-  [/🎯/g, '•'],
-  [/✅/g, '[OK]'],
-  [/💡/g, '•'],
-  [/✨/g, ''],
-  [/🔥/g, ''],
-  [/🚀/g, ''],
-  [/🎉/g, ''],
-  [/👍/g, ''],
+  [/\u{1F4CC}/gu, '§'],
+  [/\u{1F511}/gu, '•'],
+  [/\u{1F4D6}/gu, '§'],
+  [/\u{26A0}\u{FE0F}?/gu, '[!]'],
+  [/\u{1F3AF}/gu, '•'],
+  [/\u{2705}/gu, '[OK]'],
+  [/\u{1F4A1}/gu, '•'],
+  [/\u{2728}/gu, ''],
+  [/\u{1F525}/gu, ''],
+  [/\u{1F680}/gu, ''],
+  [/\u{1F389}/gu, ''],
+  [/\u{1F44D}/gu, ''],
 ];
 
 const GENERAL_EMOJI_REGEX = /[\uD800-\uDBFF][\uDC00-\uDFFF]|[\u2600-\u27BF]/g;
@@ -38,6 +38,7 @@ export function sanitizeEmojis(text: string): string {
   for (const [re, rep] of EMOJI_REPLACEMENTS) {
     clean = clean.replace(re, rep);
   }
-  return clean.replace(GENERAL_EMOJI_REGEX, '').trim();
-}
 
+  clean = clean.replace(GENERAL_EMOJI_REGEX, '');
+  return clean;
+}
