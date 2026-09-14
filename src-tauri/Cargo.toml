@@ -1,6 +1,6 @@
 [package]
 name = "app"
-version = "1.0.1"
+version = "1.0.2"
 description = "A Tauri App"
 authors = ["you"]
 license = ""
@@ -39,3 +39,8 @@ rubato = "1.0.1"
 flate2 = "1.1.10"
 reqwest = { version = "0.12", features = ["blocking", "multipart"] }
 cpal = "0.15"
+
+[profile.release]
+opt-level = 2
+codegen-units = 16
+lto = false

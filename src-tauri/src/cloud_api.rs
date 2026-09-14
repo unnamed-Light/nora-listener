@@ -647,6 +647,7 @@ pub fn summarize_text(
     include_quotes: bool,
     custom_prompt: Option<&str>,
     context_text: Option<&str>,
+    clarifying_prompt: Option<&str>,
     app: Option<&tauri::AppHandle>,
 ) -> anyhow::Result<String> {
     let client = Client::new();
@@ -736,7 +737,7 @@ pub fn summarize_text(
         String::new()
     };
 
-    let unified_prompt = if !base_prompt_text.is_empty() {
+    let mut unified_prompt = if !base_prompt_text.is_empty() {
         format!("{}{}{}", base_prompt_text, quotes_rule, context_section)
     } else {
         format!(
@@ -783,6 +784,17 @@ pub fn summarize_text(
         )
     };
 
+    if let Some(clarifying) = clarifying_prompt {
+        let trimmed = clarifying.trim();
+        if !trimmed.is_empty() {
+            unified_prompt.push_str(&format!(
+                "\n\nОСОБЫЕ ПОЖЕЛАНИЯ И УТОЧНЯЮЩИЕ УКАЗАНИЯ ПОЛЬЗОВАТЕЛЯ К ЭТОМУ КОНСПЕКТУ:\n{}\n\
+                Обязательно учти эти пожелания при раскрытии тем, расстановке акцентов и глубине изложения материала.",
+                trimmed
+            ));
+        }
+    }
+
     let summary = run_groq_session(
         &client,
         api_key,
@@ -826,7 +838,7 @@ mod tests {
         assert!(prepared.contains("мантиссу"), "Should contain lecture speech");
 
         if key.starts_with("gsk_") && key.len() > 20 {
-            let result = summarize_text(&large_transcript, &key, true, None, None, None);
+            let result = summarize_text(&large_transcript, &key, true, None, None, None, None);
             if let Ok(summary) = result {
                 println!("=== 2-HOUR LECTURE SUMMARY RESULT ===\n{}\n======================================", summary);
                 assert!(summary.len() > 100, "Summary is too short!");

@@ -18,6 +18,7 @@ export interface Transcription {
   status: TranscriptionStatus;
   path?: string;
   summary?: string;
+  clarifyingPrompt?: string;
   folderId?: string | null; // null = root
   createdAt?: string;
 }

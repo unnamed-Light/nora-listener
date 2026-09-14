@@ -5,7 +5,8 @@ export async function generateSummary(
   apiKey?: string,
   includeQuotes: boolean = false,
   customPrompt?: string,
-  contextText?: string
+  contextText?: string,
+  clarifyingPrompt?: string
 ): Promise<string> {
   const cleanKey = apiKey?.trim();
   if (!cleanKey) {
@@ -17,6 +18,7 @@ export async function generateSummary(
     apiKey: cleanKey,
     includeQuotes,
     customPrompt: customPrompt?.trim() || null,
-    contextText: contextText?.trim() || null
+    contextText: contextText?.trim() || null,
+    clarifyingPrompt: clarifyingPrompt?.trim() || null,
   });
 }

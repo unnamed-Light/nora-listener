@@ -33,6 +33,7 @@ import { renderMarkdownWithMath } from './lib/mathRenderer';
 import { UserGuideModal } from './components/UserGuideModal';
 import { SettingsModal } from './components/SettingsModal';
 import { ContextPanel } from './components/ContextPanel';
+import { ClarifyingPromptPanel } from './components/ClarifyingPromptPanel';
 import { formatContextForPrompt } from './lib/contextExtractor';
 import type { ContextItem } from './lib/contextExtractor';
 
@@ -539,6 +540,7 @@ function App() {
   const [isSummarizing, setIsSummarizing] = useState(false);
   const [showTeacherQuotes, setShowTeacherQuotes] = useState(false);
   const [contextItems, setContextItems] = useState<ContextItem[]>([]);
+  const [clarifyingPrompt, setClarifyingPrompt] = useState('');
   const [isGuideOpen, setIsGuideOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   
@@ -784,12 +786,20 @@ function App() {
     };
   }, []);
 
+  const handleClarifyingPromptChange = (val: string) => {
+    setClarifyingPrompt(val);
+    if (currentSessionId) {
+      updateTranscription(currentSessionId, { clarifyingPrompt: val });
+    }
+  };
+
   const handleNewSession = () => {
     setCurrentSessionId(null);
     setSelectedFilePath(null);
     setSelectedFileName(null);
     setTranscription('');
     setSummary('');
+    setClarifyingPrompt('');
     setContextItems([]);
     setProgress(0);
     setActiveTab('transcript');
@@ -860,6 +870,7 @@ function App() {
         date: new Date().toLocaleDateString(),
         text: fullText,
         summary: '',
+        clarifyingPrompt: clarifyingPrompt.trim() || undefined,
         status: 'completed',
         path: selectedFilePath
       });
@@ -898,7 +909,7 @@ function App() {
     try {
       const { customPrompt } = useAppStore.getState();
       const contextString = formatContextForPrompt(contextItems);
-      const generated = await generateSummary(currentText, apiKey, showTeacherQuotes, customPrompt, contextString);
+      const generated = await generateSummary(currentText, apiKey, showTeacherQuotes, customPrompt, contextString, clarifyingPrompt);
       const cleanSummary = sanitizeEmojis(generated);
       setSummary(cleanSummary);
       setActiveTab('summary');
@@ -1117,6 +1128,7 @@ function App() {
               setSelectedFilePath(item.path || null);
               setTranscription(sanitizeEmojis(item.text));
               setSummary(sanitizeEmojis(item.summary || ''));
+              setClarifyingPrompt(item.clarifyingPrompt || '');
               if (targetTab === 'summary' || (item.summary && !item.text)) {
                 setActiveTab('summary');
                 setSummaryViewMode('preview');
@@ -1383,6 +1395,12 @@ function App() {
             contextItems={contextItems}
             onAddItems={(newItems) => setContextItems(prev => [...prev, ...newItems])}
             onRemoveItem={(id) => setContextItems(prev => prev.filter(item => item.id !== id))}
+            language={language}
+          />
+
+          <ClarifyingPromptPanel
+            value={clarifyingPrompt}
+            onChange={handleClarifyingPromptChange}
             language={language}
           />
 

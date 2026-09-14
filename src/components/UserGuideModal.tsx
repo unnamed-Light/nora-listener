@@ -664,11 +664,11 @@ export const UserGuideModal: React.FC<UserGuideModalProps> = ({ isOpen, onClose,
                   <span className={styles.stepNumber}>4</span>
                   {isEn ? (
                     <>
-                      <Body1Strong>Generate notes:</Body1Strong> click the «Сделать умный конспект» (Make Smart Notes) button to obtain structured study notes with LaTeX formulas and exam review sections (Groq API key is configured in «Настройки» / Settings).
+                      <Body1Strong>Generate notes:</Body1Strong> optionally attach slides/notes or provide preferences in the clarifying input field, then click the «Сделать умный конспект» (Make Smart Notes) button to obtain structured study notes with LaTeX formulas and exam review sections (Groq API key is configured in «Настройки» / Settings).
                     </>
                   ) : (
                     <>
-                      <Body1Strong>Сформируйте конспект:</Body1Strong> нажмите кнопку «Сделать умный конспект» для получения готового конспекта с формулами LaTeX и разделами к экзамену (ключ Groq API задается в окне «Настройки»).
+                      <Body1Strong>Сформируйте конспект:</Body1Strong> при необходимости прикрепите материалы к занятию или укажите пожелания в поле уточняющего контекста, затем нажмите «Сделать умный конспект» для получения готового академического конспекта с формулами LaTeX (ключ Groq API задается в окне «Настройки»).
                     </>
                   )}
                 </div>
@@ -1028,6 +1028,28 @@ export const UserGuideModal: React.FC<UserGuideModalProps> = ({ isOpen, onClose,
                   ) : (
                     <>
                       <Body1Strong>Ключ Groq API:</Body1Strong> для анализа лекции и создания конспекта используется модель LLM. Укажите бесплатный ключ API в окне «Настройки» (кнопка в левом верхнем углу окна). Бесплатный ключ создается за минуту в <ExternalLink href="https://console.groq.com/keys">Groq Console</ExternalLink>.
+                    </>
+                  )}
+                </li>
+                <li>
+                  {isEn ? (
+                    <>
+                      <Body1Strong>Lecture Context Materials:</Body1Strong> attach slides (.pptx), Word documents (.docx), PDFs, or text notes directly above tabs. Nora extracts text in-memory to cross-reference spoken terminology with lecture slides and supplement formulas tagged as [From lecture materials / slides].
+                    </>
+                  ) : (
+                    <>
+                      <Body1Strong>Контекст занятия (материалы к лекции):</Body1Strong> прикрепляйте презентации (.pptx), документы (.docx), методички (.pdf) и заметки. Нора локально в памяти извлекает структуру и формулы, сверяет термины и дополняет конспект сведениями со слайдов с пометкой [Из материалов лекции / слайдов].
+                    </>
+                  )}
+                </li>
+                <li>
+                  {isEn ? (
+                    <>
+                      <Body1Strong>Notes Preferences (Clarifying Context):</Body1Strong> a dedicated input field directly below lecture context allows you to provide custom instructions for Nora (e.g. explain a specific theorem in more depth, emphasize midterm topics, or adopt a particular format). Instructions are preserved within the active session.
+                    </>
+                  ) : (
+                    <>
+                      <Body1Strong>Пожелания к конспекту (уточняющий контекст):</Body1Strong> поле ввода под контекстом занятия позволяет передать персональные пожелания Норе (например, детальнее разобрать конкретную теорему с доказательством, сделать акцент на вопросах к коллоквиуму или привести код на определенном языке). Текст пожеланий сохраняется в рамках текущей сессии.
                     </>
                   )}
                 </li>

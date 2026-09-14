@@ -2,7 +2,7 @@
 
 [English](ARCHITECTURE_EN.md) | [Русский](ARCHITECTURE.md)
 
-This document provides an in-depth engineering breakdown of the architectural decisions, algorithms, data processing pipelines, and technology stack powering Nora Listener (v1.0.1).
+This document provides an in-depth engineering breakdown of the architectural decisions, algorithms, data processing pipelines, and technology stack powering Nora Listener (v1.0.2).
 
 ---
 
@@ -173,6 +173,25 @@ The application settings dialog (`SettingsModal.tsx`) includes a dedicated Nora 
 - Users can customize the core pedagogical instructions followed by the AI (e.g. emphasizing coding examples for computer science or formal proofs for pure mathematics).
 - Custom instructions persist in the Zustand store (`appStore.ts`) via `localStorage` with instant one-click restoration to the canonical prompt (`DEFAULT_NORA_PROMPT`).
 
+### 5.5. User Steering Preferences (Clarifying Prompt Engine)
+Version 1.0.2 introduces a custom user instruction mechanism for directing lecture note synthesis (`ClarifyingPromptPanel.tsx`):
+1. **Ergonomics and Placement**:
+   - The input field is located directly below the lecture context panel and above the workspace tab row.
+   - Includes real-time character counting, example placeholders, and a quick-clear action button.
+2. **Session-Scoped Isolation and Lecture Binding**:
+   - Steering instructions are strictly scoped to the active lecture session: persisted in `historyStore` under the `clarifyingPrompt` field of each `Transcription` entry.
+   - Navigating between lectures in the folder tree preserves and restores preferences per session.
+   - Invoking "New Session" resets the field along with all other active session parameters.
+3. **End-to-End Delivery and System Prompt Injection**:
+   - Preferences pass through typed interfaces: `App.tsx` -> `summarizer.ts` -> native Tauri command `generate_summary` (`lib.rs`) -> `cloud_api::summarize_text`.
+   - Groq LLM queries receive a high-priority steering directive:
+     ```text
+     ОСОБЫЕ ПОЖЕЛАНИЯ И УТОЧНЯЮЩИЕ УКАЗАНИЯ ПОЛЬЗОВАТЕЛЯ К ЭТОМУ КОНСПЕКТУ:
+     [user instructions]
+     Обязательно учти эти пожелания при раскрытии тем, расстановке акцентов и глубине изложения материала.
+     ```
+   - The model adjusts focus according to student needs (deepening proofs, highlighting exam questions, generating code samples) without violating the mandatory 5-section academic structure.
+
 ---
 
 ## 6. Frontend Architecture and Client Performance (React 19 + TypeScript)
@@ -241,7 +260,7 @@ All document compilation occurs locally in the browser:
 
 ## 8. Summary and Architectural Conclusions
 
-The architecture of **Nora Listener v1.0.1** delivers a performant balance between local processing and cloud-accelerated intelligence:
+The architecture of **Nora Listener v1.0.2** delivers a performant balance between local processing and cloud-accelerated intelligence:
 1. **Security and Privacy**: Audio capture, DSP noise reduction, spectral speaker diarization, and slide document ingestion (.docx, .pptx, .pdf) run 100% locally on the user's computer.
 2. **Speed**: Delegating speech recognition and synthesis to Groq Cloud LPUs bypasses weak laptop GPUs, generating academic notes in seconds.
 3. **Ergonomics and Polish**: Persistent folder organization, full-row drag-and-drop, split view, selective multi-format export, and dynamic prompt customization provide a unified environment for university learning.
