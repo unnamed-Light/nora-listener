@@ -2,7 +2,7 @@
 
 [English](ARCHITECTURE_EN.md) | [Русский](ARCHITECTURE.md)
 
-This document provides an in-depth engineering breakdown of the architectural decisions, algorithms, data processing pipelines, and technology stack powering Nora Listener (v1.0.2).
+This document provides an in-depth engineering breakdown of the architectural decisions, algorithms, data processing pipelines, and technology stack powering Nora Listener (v1.1.0).
 
 ---
 
@@ -191,6 +191,22 @@ Version 1.0.2 introduces a custom user instruction mechanism for directing lectu
      Обязательно учти эти пожелания при раскрытии тем, расстановке акцентов и глубине изложения материала.
      ```
    - The model adjusts focus according to student needs (deepening proofs, highlighting exam questions, generating code samples) without violating the mandatory 5-section academic structure.
+
+### 5.6. Real-Time Live Streaming Transcription Engine
+In version 1.1.0, Nora Listener introduces a streaming speech-to-text pipeline that transcribes speech live during microphone recording:
+1. **Non-blocking WASAPI Audio Capture (`native_audio.rs`)**:
+   - High-priority `cpal` audio thread replicates incoming f32 samples across two pathways:
+     - Master buffer (`Arc<Mutex<Vec<f32>>>`) preserving the complete uncompressed 16 kHz 16-bit mono WAV recording in `app_data_dir/recordings/`.
+     - Non-blocking `std::sync::mpsc::channel` routing frames into a dedicated background worker thread (`nora-realtime-worker`).
+2. **4-Tier Context Preservation Pipeline**:
+   - **Tier 1 (Dynamic Acoustic Boundary)**: RMS energy computed across 50 ms frames. Chunk boundaries trigger exclusively during speaker breath pauses (`vad_silence_ms`: 400-1200 ms) or upon reaching maximum window size (`chunk_window_sec`: 4-12s) at a local volume dip.
+   - **Tier 2 (500 ms Audio Overlap Buffer)**: each subsequent chunk prepends 500 ms from the preceding chunk tail, safeguarding transient initial consonants.
+   - **Tier 3 (Whisper Decoder Prompt Conditioning)**: requests to Groq Whisper incorporate `previous_tail` (last 25 words of recognized speech), ensuring grammatical cohesion, case consistency, and seamless punctuation flow.
+   - **Tier 4 (Cross-Chunk Boundary Deduplication `stitch_transcription_tail`)**: native Rust algorithm identifies duplicate word overlaps across adjacent chunks, deduplicating repetitive prefixes and normalizing letter casing.
+3. **Reactive UI Streaming**:
+   - `realtime-transcription-chunk` events deliver finalized text increments to `App.tsx`.
+   - Text streams directly into the editor with automatic scrolling.
+   - Once recording stops, the lecture transcript is immediately available on screen, ready for instant smart summary generation without transcription re-runs.
 
 ---
 

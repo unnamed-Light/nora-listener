@@ -728,6 +728,50 @@ export const UserGuideModal: React.FC<UserGuideModalProps> = ({ isOpen, onClose,
             </div>
 
             <div className={styles.sectionCard}>
+              <Subtitle2>{isEn ? 'Live Microphone Recording & Real-Time Transcription (v1.1.0)' : 'Живая запись с микрофона и транскрибация в реальном времени (v1.1.0)'}</Subtitle2>
+              <Body1>
+                {isEn
+                  ? 'Nora Listener features a non-blocking streaming engine that transcribes speech directly during lecture recording with full sentence context preservation:'
+                  : 'В Nora Listener встроен неблокирующий потоковый движок, распознающий речь преподавателя прямо во время записи лекции с сохранением непрерывного контекста фраз:'}
+              </Body1>
+              <ul className={styles.bulletList}>
+                <li>
+                  {isEn ? (
+                    <>
+                      <Body1Strong>4-Tier Context Preservation Pipeline:</Body1Strong> dynamic acoustic VAD boundaries (words are never sliced in half), 500 ms audio overlap buffer, Groq Whisper decoder conditioning via recent transcript prompt injection, and intelligent cross-chunk duplicate deduplication.
+                    </>
+                  ) : (
+                    <>
+                      <Body1Strong>4-уровневое сшивание контекста:</Body1Strong> динамический срез по естественным паузам дыхания VAD (слова не режутся на полуслове), буфер нахлеста 500 мс, кондиционирование декодера Whisper через параметр prompt и нативное устранение дубликатов на стыках.
+                    </>
+                  )}
+                </li>
+                <li>
+                  {isEn ? (
+                    <>
+                      <Body1Strong>Lossless Full WAV Preservation:</Body1Strong> alongside live transcription, the complete unmodified 16 kHz 16-bit mono lecture audio is saved to the recordings/ directory for future offline analysis or acoustic speaker diarization.
+                    </>
+                  ) : (
+                    <>
+                      <Body1Strong>Сохранение полного WAV-файла:</Body1Strong> параллельно с живой расшифровкой полная аудиозапись лекции сохраняется на диск в каталог recordings/ в эталонном качестве 16 кГц 16 бит моно.
+                    </>
+                  )}
+                </li>
+                <li>
+                  {isEn ? (
+                    <>
+                      <Body1Strong>Instant Note Generation:</Body1Strong> when recording ends, the lecture is already completely transcribed on screen and ready for instant structured summary synthesis.
+                    </>
+                  ) : (
+                    <>
+                      <Body1Strong>Мгновенный конспект:</Body1Strong> сразу после нажатия кнопки «Остановить запись» лекция уже полностью расшифрована и готова к немедленному созданию конспекта.
+                    </>
+                  )}
+                </li>
+              </ul>
+            </div>
+
+            <div className={styles.sectionCard}>
               <Subtitle2>{isEn ? 'Built-in Audio Enhancement Pipeline (DSP):' : 'Встроенный алгоритм очистки звука (DSP Pipeline):'}</Subtitle2>
               <ul className={styles.bulletList}>
                 <li>

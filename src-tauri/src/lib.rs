@@ -11,8 +11,12 @@ fn list_native_audio_devices() -> Vec<native_audio::NativeAudioDevice> {
 }
 
 #[tauri::command]
-fn start_native_recording(app: tauri::AppHandle, device_id: Option<String>) -> Result<(), String> {
-    native_audio::start_recording(app, device_id)
+fn start_native_recording(
+    app: tauri::AppHandle,
+    device_id: Option<String>,
+    realtime_config: Option<native_audio::RealtimeConfig>,
+) -> Result<(), String> {
+    native_audio::start_recording(app, device_id, realtime_config)
 }
 
 #[tauri::command]

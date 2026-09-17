@@ -1,7 +1,7 @@
 {
   "name": "nora-listener",
   "private": true,
-  "version": "1.0.2",
+  "version": "1.1.0",
   "description": "Nora Listener - Academic AI assistant for lecture transcription, speaker diarization and smart summarization",
   "license": "MIT",
   "type": "module",

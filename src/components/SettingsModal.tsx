@@ -2,13 +2,13 @@ import React, { useState } from 'react';
 import {
   makeStyles, shorthands, tokens, Dialog, DialogSurface, DialogBody,
   DialogTitle, DialogContent, DialogActions, Button, Input, Select,
-  Body1, Body1Strong, Caption1, Badge, Divider, TabList, Tab, Textarea,
+  Body1, Body1Strong, Caption1, Badge, Divider, TabList, Tab, Textarea, Switch,
 } from '@fluentui/react-components';
 import {
   Settings24Regular, DismissRegular, Eye20Regular, EyeOff20Regular,
   Delete20Regular, Key20Regular, Globe20Regular, Info20Regular,
   Open16Regular, Checkmark16Regular, WeatherSunny20Regular, WeatherMoon20Regular,
-  Sparkle20Regular, ArrowUndo16Regular
+  Sparkle20Regular, ArrowUndo16Regular, Mic20Regular
 } from '@fluentui/react-icons';
 import { useAppStore } from '../store/appStore';
 import { openExternalUrl } from '../lib/openUrl';
@@ -156,7 +156,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, l
   const styles = useStyles();
   const {
     theme, toggleTheme, apiKey, setApiKey, setLanguage,
-    customPrompt, setCustomPrompt, resetPromptToDefault
+    customPrompt, setCustomPrompt, resetPromptToDefault,
+    realtimeTranscriptionEnabled, setRealtimeTranscriptionEnabled,
+    realtimeModel, setRealtimeModel,
+    realtimeChunkWindow, setRealtimeChunkWindow,
+    realtimeVadSensitivity, setRealtimeVadSensitivity
   } = useAppStore();
   const [activeTab, setActiveTab] = useState<'general' | 'prompt'>('general');
   const [showKey, setShowKey] = useState<boolean>(false);
@@ -367,6 +371,107 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, l
 
                 <Divider />
 
+                {/* Real-time Transcription Section */}
+                <div className={styles.section}>
+                  <div className={styles.sectionTitleRow}>
+                    <div className={styles.sectionHeader}>
+                      <Mic20Regular style={{ color: tokens.colorBrandForeground1 }} />
+                      <Body1Strong>{isRu ? 'Транскрибация в реальном времени' : 'Real-time Live Transcription'}</Body1Strong>
+                    </div>
+                    {realtimeTranscriptionEnabled ? (
+                      <Badge appearance="filled" color="brand" size="small">
+                        {isRu ? 'Включено' : 'Enabled'}
+                      </Badge>
+                    ) : (
+                      <Badge appearance="tint" color="subtle" size="small">
+                        {isRu ? 'Выключено' : 'Disabled'}
+                      </Badge>
+                    )}
+                  </div>
+
+                  <Caption1 style={{ color: tokens.colorNeutralForeground3 }}>
+                    {isRu
+                      ? 'Распознавание речи на лету во время записи лекции с микрофона с сохранением контекста фраз:'
+                      : 'Live speech recognition during mic recording with full sentence context preservation:'}
+                  </Caption1>
+
+                  <div style={{ marginTop: '4px' }}>
+                    <Switch
+                      checked={realtimeTranscriptionEnabled}
+                      onChange={(_, data) => setRealtimeTranscriptionEnabled(data.checked)}
+                      label={isRu ? 'Включить распознавание на лету при записи с микрофона' : 'Enable live speech recognition during mic recording'}
+                    />
+                  </div>
+
+                  {realtimeTranscriptionEnabled && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '8px', paddingLeft: '4px' }}>
+                      <div>
+                        <Caption1 style={{ display: 'block', marginBottom: '4px', fontWeight: 600, color: tokens.colorNeutralForeground2 }}>
+                          {isRu ? 'Модель для распознавания на лету:' : 'Live streaming recognition model:'}
+                        </Caption1>
+                        <Select
+                          value={realtimeModel}
+                          onChange={(_, data) => setRealtimeModel(data.value as any)}
+                          size="medium"
+                          style={{ width: '100%', maxWidth: '420px' }}
+                        >
+                          <option value="whisper-large-v3-turbo">
+                            {isRu ? 'Whisper Large v3 Turbo (Рекомендуется, задержка ~150 мс)' : 'Whisper Large v3 Turbo (Recommended, ~150ms)'}
+                          </option>
+                          <option value="whisper-large-v3">
+                            {isRu ? 'Whisper Large v3 (Максимальная академическая точность)' : 'Whisper Large v3 (Maximum academic accuracy)'}
+                          </option>
+                        </Select>
+                      </div>
+
+                      <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+                        <div style={{ flex: '1 1 200px' }}>
+                          <Caption1 style={{ display: 'block', marginBottom: '4px', fontWeight: 600, color: tokens.colorNeutralForeground2 }}>
+                            {isRu ? 'Окно накопления аудио:' : 'Audio chunk window:'}
+                          </Caption1>
+                          <Select
+                            value={String(realtimeChunkWindow)}
+                            onChange={(_, data) => setRealtimeChunkWindow(Number(data.value) as any)}
+                            size="medium"
+                            style={{ width: '100%' }}
+                          >
+                            <option value="4">{isRu ? 'Быстрое (4-5 сек, мин. задержка)' : 'Fast (4-5s, minimal latency)'}</option>
+                            <option value="7">{isRu ? 'Сбалансированное (7-8 сек, оптимум)' : 'Balanced (7-8s, optimal)'}</option>
+                            <option value="10">{isRu ? 'Большие фразы (10-12 сек, контекст)' : 'Large phrases (10-12s, context)'}</option>
+                          </Select>
+                        </div>
+
+                        <div style={{ flex: '1 1 200px' }}>
+                          <Caption1 style={{ display: 'block', marginBottom: '4px', fontWeight: 600, color: tokens.colorNeutralForeground2 }}>
+                            {isRu ? 'Чувствительность к паузам (VAD):' : 'Pause sensitivity (VAD):'}
+                          </Caption1>
+                          <Select
+                            value={String(realtimeVadSensitivity)}
+                            onChange={(_, data) => setRealtimeVadSensitivity(Number(data.value) as any)}
+                            size="medium"
+                            style={{ width: '100%' }}
+                          >
+                            <option value="400">{isRu ? 'Быстрая пауза (400 мс)' : 'Short pause (400ms)'}</option>
+                            <option value="700">{isRu ? 'Стандартная пауза лектора (700 мс)' : 'Standard pause (700ms)'}</option>
+                            <option value="1200">{isRu ? 'Длинная пауза (1200 мс)' : 'Long pause (1200ms)'}</option>
+                          </Select>
+                        </div>
+                      </div>
+
+                      <div className={styles.callout}>
+                        <Info20Regular style={{ flexShrink: 0, marginTop: '2px', color: tokens.colorNeutralForeground3 }} />
+                        <Caption1 style={{ color: tokens.colorNeutralForeground2, lineHeight: '1.45' }}>
+                          {isRu
+                            ? 'Слова и формулы лектора плавно заполняют редактор в реальном времени. Контекст непрерывно сшивается без обрывов фраз. После завершения записи полный 16 кГц WAV сохраняется на диск без сжатия.'
+                            : 'Lecturer speech smoothly populates the editor in real-time. Context is continuously stitched without sentence drops. Full 16 kHz WAV audio is saved losslessly to disk.'}
+                        </Caption1>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <Divider />
+
                 {/* About Section */}
                 <div className={styles.section}>
                   <div className={styles.sectionHeader}>
@@ -374,7 +479,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, l
                     <Body1Strong>{isRu ? 'О программе' : 'About Application'}</Body1Strong>
                   </div>
                   <Body1 style={{ fontSize: '13px', color: tokens.colorNeutralForeground2 }}>
-                    Nora Listener — v1.0.1
+                    Nora Listener — v1.1.0
                   </Body1>
                   <Caption1 style={{ color: tokens.colorNeutralForeground3 }}>
                     {isRu
