@@ -5,11 +5,15 @@ use hound::{WavSpec, WavWriter, SampleFormat as HoundSampleFormat};
 use tauri::{AppHandle, Emitter, Manager};
 
 #[derive(serde::Deserialize, serde::Serialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
 pub struct RealtimeConfig {
     pub enabled: bool,
+    #[serde(alias = "api_key")]
     pub api_key: String,
     pub model: String,
+    #[serde(alias = "chunk_window_sec")]
     pub chunk_window_sec: u32,
+    #[serde(alias = "vad_silence_ms")]
     pub vad_silence_ms: u32,
 }
 
@@ -171,10 +175,11 @@ fn realtime_worker_loop(
     let target_rate: u32 = 16000;
     let ch = channels.max(1) as usize;
 
-    let min_chunk_samples = (device_sample_rate as f32 * 3.2) as usize; // min 3.2 sec before pause dispatch
-    let max_chunk_samples = (device_sample_rate as f32 * config.chunk_window_sec.clamp(4, 15) as f32) as usize;
-    let silence_threshold_samples = ((device_sample_rate as f32 * config.vad_silence_ms.clamp(300, 2000) as f32) / 1000.0) as usize;
-    let overlap_samples_count = (device_sample_rate as f32 * 0.5) as usize; // 500ms overlap
+    let frame_rate = (device_sample_rate as usize) * ch;
+    let min_chunk_samples = (frame_rate as f32 * 3.2) as usize;
+    let max_chunk_samples = (frame_rate as f32 * config.chunk_window_sec.clamp(3, 15) as f32) as usize;
+    let silence_threshold_samples = ((frame_rate as f32 * config.vad_silence_ms.clamp(300, 2000) as f32) / 1000.0) as usize;
+    let overlap_samples_count = (frame_rate as f32 * 0.5) as usize;
 
     let mut accumulated_samples = Vec::<f32>::new();
     let mut overlap_buffer = Vec::<f32>::new();
@@ -330,6 +335,7 @@ fn realtime_worker_loop(
             let status = res.status();
             let err_text = res.text().unwrap_or_default();
             eprintln!("Groq API Error: {} - {}", status, err_text);
+            app.emit("transcription-log", format!("[Ошибка Live Groq API] {} - {}", status, err_text)).ok();
             return None;
         }
 
@@ -389,7 +395,8 @@ fn realtime_worker_loop(
             dispatch_chunk(&accumulated_samples, &overlap_buffer, chunk_index, false, &mut full_transcript);
 
             // Update overlap buffer to last 500ms of current samples
-            let take_len = overlap_samples_count.min(accumulated_samples.len());
+            let raw_take = overlap_samples_count.min(accumulated_samples.len());
+            let take_len = (raw_take / ch) * ch;
             overlap_buffer = accumulated_samples[accumulated_samples.len() - take_len..].to_vec();
 
             accumulated_samples.clear();

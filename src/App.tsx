@@ -527,6 +527,7 @@ function App() {
   const {
     theme, language, apiKey, lastSaveDirectory, selectedMicrophoneId, enableDiarization, recognitionMode,
     sidebarWidth, splitViewRatio,
+    realtimeTranscriptionEnabled, realtimeModel, realtimeChunkWindow, realtimeVadSensitivity,
     toggleTheme, setLastSaveDirectory, setSelectedMicrophoneId, setEnableDiarization, setRecognitionMode,
     setSidebarWidth, setSplitViewRatio
   } = useAppStore();
@@ -666,20 +667,52 @@ function App() {
 
   const handleStartRecording = async () => {
     try {
-      await invoke('start_native_recording', { deviceId: selectedMicrophoneId || null });
+      const isRealtime = (realtimeTranscriptionEnabled ?? true) && !!(apiKey && apiKey.trim().length > 0);
+      const realtimeConfig = isRealtime ? {
+        enabled: true,
+        apiKey: apiKey.trim(),
+        model: realtimeModel || "whisper-large-v3-turbo",
+        chunkWindowSec: realtimeChunkWindow || 7,
+        vadSilenceMs: realtimeVadSensitivity || 700,
+      } : null;
+
+      await invoke("start_native_recording", {
+        deviceId: selectedMicrophoneId || null,
+        realtimeConfig,
+      });
+
       setIsRecording(true);
       setRecordingSeconds(0);
+
+      if (isRealtime) {
+        const sessionId = Date.now().toString();
+        const initialTitle = language === "ru"
+          ? `Запись ${new Date().toLocaleDateString()}`
+          : `Recording ${new Date().toLocaleDateString()}`;
+        addTranscription({
+          id: sessionId,
+          title: initialTitle,
+          date: new Date().toLocaleDateString(),
+          text: "",
+          status: "pending",
+          createdAt: new Date().toISOString(),
+        });
+        setCurrentSessionId(sessionId);
+        setTranscription("");
+        setSummary("");
+        setActiveTab("transcript");
+      }
+
       recordTimerRef.current = setInterval(() => {
         setRecordingSeconds((prev) => prev + 1);
       }, 1000);
       const time = new Date().toLocaleTimeString();
-      const currentMic = microphones.find(m => m.id === selectedMicrophoneId)?.name || 'По умолчанию';
-      console.log(`[${time}] [Звукозапись] Запись началась (WASAPI). Микрофон: ${currentMic}`);
+      const currentMic = microphones.find(m => m.id === selectedMicrophoneId)?.name || "По умолчанию";
+      console.log(`[${time}] [Звукозапись] Запись началась (WASAPI). Микрофон: ${currentMic}. Потоковое распознавание: ${isRealtime ? "Активно (" + (realtimeModel || "whisper-large-v3-turbo") + ")" : "Отключено"}`);
     } catch (e: any) {
       alert(`Не удалось запустить запись звука: ${e?.message || String(e)}`);
     }
   };
-
   const handleStopRecording = async () => {
     if (recordTimerRef.current) {
       clearInterval(recordTimerRef.current);
@@ -693,6 +726,12 @@ function App() {
       
       setSelectedFilePath(savedPath);
       setSelectedFileName(filename);
+      if (currentSessionId) {
+        updateTranscription(currentSessionId, {
+          path: savedPath,
+          status: "completed",
+        });
+      }
       console.log(`[${time}] [Звукозапись] Аудиозапись готова к расшифровке: ${filename}`);
     } catch (e: any) {
       console.error(`[${time}] [Ошибка записи] ${e?.message || String(e)}`);
@@ -787,6 +826,45 @@ function App() {
       if (unlistenLog) unlistenLog();
     };
   }, []);
+
+  const currentSessionIdRef = useRef<string | null>(currentSessionId);
+  useEffect(() => {
+    currentSessionIdRef.current = currentSessionId;
+  }, [currentSessionId]);
+
+  useEffect(() => {
+    let unlistenChunk: (() => void) | null = null;
+    listen<{ text: string; chunk_index: number; is_final: boolean }>('realtime-transcription-chunk', (event) => {
+      const payload = event.payload;
+      if (!payload) return;
+      if (payload.text && payload.text.trim()) {
+        const added = sanitizeEmojis(payload.text.trim());
+        setTranscription((prev) => {
+          const next = prev.trim() ? `${prev.trim()} ${added}` : added;
+          if (currentSessionIdRef.current) {
+            updateTranscription(currentSessionIdRef.current, {
+              text: next,
+              status: payload.is_final ? "completed" : "pending",
+            });
+          }
+          return next;
+        });
+        setTimeout(() => {
+          if (textareaRef.current) {
+            textareaRef.current.scrollTop = textareaRef.current.scrollHeight;
+          }
+        }, 40);
+      } else if (payload.is_final && currentSessionIdRef.current) {
+        updateTranscription(currentSessionIdRef.current, {
+          status: "completed",
+        });
+      }
+    }).then(fn => { unlistenChunk = fn; });
+
+    return () => {
+      if (unlistenChunk) unlistenChunk();
+    };
+  }, [updateTranscription]);
 
   const handleClarifyingPromptChange = (val: string) => {
     setClarifyingPrompt(val);
@@ -1248,6 +1326,11 @@ function App() {
                         {formatDuration(recordingSeconds)}
                       </Badge>
                       <Body1Strong style={{ color: tokens.colorPaletteRedForeground1 }}>{t.recordInProgress}</Body1Strong>
+                      {(realtimeTranscriptionEnabled ?? true) && apiKey && (
+                        <Badge appearance="tint" color="brand" size="small">
+                          {t.liveTranscribing}
+                        </Badge>
+                      )}
                     </div>
 
                     {/* Live Audio Tape (Waveform) & Equalizer */}
@@ -1337,6 +1420,11 @@ function App() {
                     <Badge appearance="filled" color="danger" size="medium">
                       {formatDuration(recordingSeconds)}
                     </Badge>
+                    {(realtimeTranscriptionEnabled ?? true) && apiKey && (
+                      <Badge appearance="tint" color="brand" size="small">
+                        Live
+                      </Badge>
+                    )}
                     <AudioVisualizer 
                       isRecording={isRecording} 
                       width={120} 
