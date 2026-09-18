@@ -474,13 +474,22 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, l
 
                 {/* About Section */}
                 <div className={styles.section}>
-                  <div className={styles.sectionHeader}>
-                    <Info20Regular style={{ color: tokens.colorBrandForeground1 }} />
-                    <Body1Strong>{isRu ? 'О программе' : 'About Application'}</Body1Strong>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
+                    <img 
+                      src="/app-icon.png" 
+                      alt="Nora Listener" 
+                      style={{ width: '40px', height: '40px', borderRadius: '10px', boxShadow: '0 2px 8px rgba(0,0,0,0.3)', flexShrink: 0 }} 
+                    />
+                    <div>
+                      <div className={styles.sectionHeader} style={{ marginBottom: '2px' }}>
+                        <Info20Regular style={{ color: tokens.colorBrandForeground1 }} />
+                        <Body1Strong>{isRu ? 'О программе' : 'About Application'}</Body1Strong>
+                      </div>
+                      <Body1 style={{ fontSize: '13px', color: tokens.colorNeutralForeground2 }}>
+                        Nora Listener — v1.1.0
+                      </Body1>
+                    </div>
                   </div>
-                  <Body1 style={{ fontSize: '13px', color: tokens.colorNeutralForeground2 }}>
-                    Nora Listener — v1.1.0
-                  </Body1>
                   <Caption1 style={{ color: tokens.colorNeutralForeground3 }}>
                     {isRu
                       ? 'Академический ассистент для студентов и преподавателей. Локальная DSP-фильтрация аудио, контекстный синтез материалов и ускоренное облачное распознавание Whisper Large v3 / Turbo на базе Groq LPU.'

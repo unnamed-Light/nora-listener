@@ -1181,7 +1181,14 @@ function App() {
           style={{ width: `${sidebarWidth}px`, minWidth: '180px', maxWidth: '550px' }}
         >
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <Title2>{t.title}</Title2>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <img 
+                src="/app-icon.png" 
+                alt="Nora Listener" 
+                style={{ width: '28px', height: '28px', borderRadius: '7px', boxShadow: '0 2px 6px rgba(0,0,0,0.25)', flexShrink: 0 }} 
+              />
+              <Title2 style={{ margin: 0, lineHeight: '28px' }}>{t.title}</Title2>
+            </div>
             <Button
               appearance="subtle"
               icon={<Settings24Regular />}
