@@ -32,6 +32,9 @@ import { highlightHtmlMatches, countMatches, escapeRegex } from './lib/searchUti
 import { renderMarkdownWithMath } from './lib/mathRenderer';
 import { UserGuideModal } from './components/UserGuideModal';
 import { SettingsModal } from './components/SettingsModal';
+import { UpdateModal } from './components/UpdateModal';
+import { checkForUpdates } from './lib/updateChecker';
+import type { UpdateInfo } from './lib/updateChecker';
 import { ContextPanel } from './components/ContextPanel';
 import { ClarifyingPromptPanel } from './components/ClarifyingPromptPanel';
 import { formatContextForPrompt } from './lib/contextExtractor';
@@ -546,6 +549,32 @@ function App() {
   const [clarifyingPrompt, setClarifyingPrompt] = useState('');
   const [isGuideOpen, setIsGuideOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
+  const [pendingUpdateInfo, setPendingUpdateInfo] = useState<UpdateInfo | null>(null);
+
+  const autoCheckUpdates = useAppStore((state) => state.autoCheckUpdates);
+  const ignoredUpdateVersion = useAppStore((state) => state.ignoredUpdateVersion);
+  const setIgnoredUpdateVersion = useAppStore((state) => state.setIgnoredUpdateVersion);
+  const setLastUpdateCheckTime = useAppStore((state) => state.setLastUpdateCheckTime);
+
+  // Background update check on startup
+  useEffect(() => {
+    if (!autoCheckUpdates) return;
+    const timer = setTimeout(async () => {
+      try {
+        const info = await checkForUpdates('1.1.0');
+        setLastUpdateCheckTime(Date.now());
+        if (info.hasUpdate && info.latestVersion !== ignoredUpdateVersion) {
+          setPendingUpdateInfo(info);
+          setIsUpdateModalOpen(true);
+        }
+      } catch (err) {
+        console.log('[UpdateChecker] Startup check completed or silent:', err);
+      }
+    }, 3500);
+
+    return () => clearTimeout(timer);
+  }, [autoCheckUpdates, ignoredUpdateVersion]);
   
   const [isDragging, setIsDragging] = useState(false);
   const [selectedFilePath, setSelectedFilePath] = useState<string | null>(null);
@@ -1926,6 +1955,18 @@ function App() {
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
         language={language}
+        onOpenUpdateModal={(info: UpdateInfo) => {
+          setPendingUpdateInfo(info);
+          setIsUpdateModalOpen(true);
+        }}
+      />
+
+      <UpdateModal
+        isOpen={isUpdateModalOpen}
+        onClose={() => setIsUpdateModalOpen(false)}
+        updateInfo={pendingUpdateInfo}
+        language={language}
+        onSkipVersion={(version) => setIgnoredUpdateVersion(version)}
       />
     </div>
   );

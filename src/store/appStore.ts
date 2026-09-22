@@ -30,6 +30,9 @@ interface AppState {
   realtimeModel: RealtimeModel;
   realtimeChunkWindow: RealtimeWindow;
   realtimeVadSensitivity: VadSensitivity;
+  autoCheckUpdates: boolean;
+  ignoredUpdateVersion: string | null;
+  lastUpdateCheckTime: number | null;
   toggleTheme: () => void;
   setAiMode: (mode: AiMode) => void;
   setLanguage: (lang: Language) => void;
@@ -48,6 +51,9 @@ interface AppState {
   setRealtimeModel: (model: RealtimeModel) => void;
   setRealtimeChunkWindow: (window: RealtimeWindow) => void;
   setRealtimeVadSensitivity: (sensitivity: VadSensitivity) => void;
+  setAutoCheckUpdates: (enabled: boolean) => void;
+  setIgnoredUpdateVersion: (version: string | null) => void;
+  setLastUpdateCheckTime: (time: number | null) => void;
 }
 
 export const useAppStore = create<AppState>()(
@@ -70,6 +76,9 @@ export const useAppStore = create<AppState>()(
       realtimeModel: 'whisper-large-v3-turbo',
       realtimeChunkWindow: 7,
       realtimeVadSensitivity: 700,
+      autoCheckUpdates: true,
+      ignoredUpdateVersion: null,
+      lastUpdateCheckTime: null,
       toggleTheme: () => set((state) => ({ theme: state.theme === 'light' ? 'dark' : 'light' })),
       setAiMode: (mode) => set({ aiMode: mode }),
       setLanguage: (lang) => set({ language: lang }),
@@ -88,6 +97,9 @@ export const useAppStore = create<AppState>()(
       setRealtimeModel: (model) => set({ realtimeModel: model }),
       setRealtimeChunkWindow: (window) => set({ realtimeChunkWindow: window }),
       setRealtimeVadSensitivity: (sensitivity) => set({ realtimeVadSensitivity: sensitivity }),
+      setAutoCheckUpdates: (enabled) => set({ autoCheckUpdates: enabled }),
+      setIgnoredUpdateVersion: (version) => set({ ignoredUpdateVersion: version }),
+      setLastUpdateCheckTime: (time) => set({ lastUpdateCheckTime: time }),
     }),
     {
       name: 'app-store',

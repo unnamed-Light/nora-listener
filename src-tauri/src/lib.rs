@@ -2,6 +2,7 @@ pub mod whisper_candle;
 pub mod cloud_api;
 pub mod native_audio;
 pub mod diarization;
+pub mod update_checker;
 
 
 
@@ -94,6 +95,19 @@ fn save_recorded_audio(app: tauri::AppHandle, filename: String, data: Vec<u8>) -
     Ok(dir.to_string_lossy().to_string())
 }
 
+#[tauri::command]
+async fn check_for_updates() -> Result<update_checker::UpdateInfo, String> {
+    let repo = "unnamed-Light/nora-listener";
+    let current_version = env!("CARGO_PKG_VERSION");
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        update_checker::check_github_release(repo, current_version)
+    })
+    .await
+    .map_err(|e| e.to_string())?;
+
+    result
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
   tauri::Builder::default()
@@ -107,7 +121,8 @@ pub fn run() {
       save_recorded_audio,
       list_native_audio_devices,
       start_native_recording,
-      stop_native_recording
+      stop_native_recording,
+      check_for_updates
     ])
     .setup(|app| {
       if cfg!(debug_assertions) {

@@ -686,6 +686,15 @@ export const UserGuideModal: React.FC<UserGuideModalProps> = ({ isOpen, onClose,
                 </div>
               </div>
             </div>
+
+            <div className={styles.sectionCard}>
+              <Subtitle2>{isEn ? 'Automatic Release Tracking & Updates' : 'Автоматическое отслеживание релизов и обновлений'}</Subtitle2>
+              <Body1>
+                {isEn
+                  ? 'Nora Listener automatically checks for new releases on GitHub upon launch. When an update is detected, a notification dialog presents the changelog and provides an instant one-click link to download the new version. You can also manually check for updates in Settings at any time.'
+                  : 'Nora Listener автоматически проверяет появление новых релизов на GitHub при каждом запуске. При обнаружении обновления открывается окно со списком изменений и кнопкой для перехода к скачиванию. Вы также можете вручную проверить обновления в окне «Настройки» в любой момент.'}
+              </Body1>
+            </div>
           </>
         );
 

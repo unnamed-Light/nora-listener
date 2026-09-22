@@ -210,6 +210,24 @@ In version 1.1.0, Nora Listener introduces a streaming speech-to-text pipeline t
 
 ---
 
+
+### 5.7. Release Tracking & Update Checker Pipeline
+
+To ensure users stay up to date with new features and fixes, Nora Listener implements a dedicated update checking pipeline:
+1. **Native Verification Module (`src-tauri/src/update_checker.rs`)**:
+   - Dispatches a lightweight asynchronous HTTPS GET query to the public GitHub Releases API endpoint (`https://api.github.com/repos/unnamed-Light/nora-listener/releases/latest`) with a `User-Agent: Nora-Listener-Desktop` header.
+   - Requires zero API tokens, bypasses browser CORS constraints, and respects OS-level proxy settings.
+2. **Semantic Versioning Engine (SemVer Parser)**:
+   - Parses release tag strings (handling `v`/`V` prefixes and hotfix annotations) into a structured `SemVer { major, minor, patch }` representation.
+   - Compares the running binary version (`env!("CARGO_PKG_VERSION")`) against the remote release tag.
+3. **Background & On-Demand Execution**:
+   - *Silent startup check*: triggers automatically 3.5 seconds after GUI initialization without degrading responsiveness.
+   - *Manual check*: triggered on demand via the "Check for Updates" button in Settings.
+4. **Interactive Update Dialog (`UpdateModal.tsx`)**:
+   - Displays a styled Fluent UI modal outlining release notes, release date, and version transitions.
+   - The "Update Now" action securely launches the default web browser targeting the GitHub release page via `tauri-plugin-shell`.
+   - Allows users to skip specific versions (`ignoredUpdateVersion`) or toggle startup checks off in preferences.
+
 ## 6. Frontend Architecture and Client Performance (React 19 + TypeScript)
 
 ### 6.1. Folder Tree and Gesture Drag-and-Drop (`FolderTree.tsx`)

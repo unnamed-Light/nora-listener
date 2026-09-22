@@ -2,16 +2,19 @@ import React, { useState } from 'react';
 import {
   makeStyles, shorthands, tokens, Dialog, DialogSurface, DialogBody,
   DialogTitle, DialogContent, DialogActions, Button, Input, Select,
-  Body1, Body1Strong, Caption1, Badge, Divider, TabList, Tab, Textarea, Switch,
+  Body1, Body1Strong, Caption1, Badge, Divider, TabList, Tab, Textarea, Switch, Spinner,
 } from '@fluentui/react-components';
 import {
   Settings24Regular, DismissRegular, Eye20Regular, EyeOff20Regular,
   Delete20Regular, Key20Regular, Globe20Regular, Info20Regular,
   Open16Regular, Checkmark16Regular, WeatherSunny20Regular, WeatherMoon20Regular,
-  Sparkle20Regular, ArrowUndo16Regular, Mic20Regular
+  Sparkle20Regular,
+  ArrowSync20Regular, ArrowUndo16Regular, Mic20Regular
 } from '@fluentui/react-icons';
 import { useAppStore } from '../store/appStore';
 import { openExternalUrl } from '../lib/openUrl';
+import { checkForUpdates } from '../lib/updateChecker';
+import type { UpdateInfo } from '../lib/updateChecker';
 
 const useStyles = makeStyles({
   surface: {
@@ -150,9 +153,10 @@ interface SettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
   language: 'ru' | 'en';
+  onOpenUpdateModal?: (info: UpdateInfo) => void;
 }
 
-export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, language }) => {
+export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, language, onOpenUpdateModal }) => {
   const styles = useStyles();
   const {
     theme, toggleTheme, apiKey, setApiKey, setLanguage,
@@ -168,6 +172,32 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, l
   const [promptNotice, setPromptNotice] = useState<boolean>(false);
 
   const isRu = language === 'ru';
+  const autoCheckUpdates = useAppStore((state) => state.autoCheckUpdates);
+  const setAutoCheckUpdates = useAppStore((state) => state.setAutoCheckUpdates);
+  const [isCheckingUpdate, setIsCheckingUpdate] = React.useState(false);
+  const [updateStatusText, setUpdateStatusText] = React.useState<string | null>(null);
+  const [latestFoundInfo, setLatestFoundInfo] = React.useState<UpdateInfo | null>(null);
+
+  const handleManualCheckUpdates = async () => {
+    setIsCheckingUpdate(true);
+    setUpdateStatusText(null);
+    setLatestFoundInfo(null);
+    try {
+      const info = await checkForUpdates('1.1.0');
+      if (info.hasUpdate) {
+        setLatestFoundInfo(info);
+        if (onOpenUpdateModal) {
+          onOpenUpdateModal(info);
+        }
+      } else {
+        setUpdateStatusText(isRu ? 'У вас установлена самая актуальная версия' : 'You are using the latest version');
+      }
+    } catch (err: any) {
+      setUpdateStatusText(isRu ? 'Не удалось проверить обновления: ' + (err?.message || String(err)) : 'Failed to check updates: ' + (err?.message || String(err)));
+    } finally {
+      setIsCheckingUpdate(false);
+    }
+  };
 
   const handleKeyChange = (val: string) => {
     setApiKey(val.trim());
@@ -495,6 +525,44 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, l
                       ? 'Академический ассистент для студентов и преподавателей. Локальная DSP-фильтрация аудио, контекстный синтез материалов и ускоренное облачное распознавание Whisper Large v3 / Turbo на базе Groq LPU.'
                       : 'Academic lecture assistant for students and lecturers. Local DSP audio preprocessing, context material synthesis, and accelerated Whisper Large v3 / Turbo speech recognition powered by Groq LPU.'}
                   </Caption1>
+
+                  <div style={{ marginTop: '14px', paddingTop: '12px', borderTop: `1px solid ${tokens.colorNeutralStroke3}` }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <Button
+                          size="small"
+                          appearance="secondary"
+                          icon={isCheckingUpdate ? <Spinner size="tiny" /> : <ArrowSync20Regular />}
+                          disabled={isCheckingUpdate}
+                          onClick={handleManualCheckUpdates}
+                        >
+                          {isRu ? 'Проверить обновления' : 'Check for Updates'}
+                        </Button>
+                        {latestFoundInfo && (
+                          <Badge
+                            appearance="filled"
+                            color="brand"
+                            size="small"
+                            style={{ cursor: 'pointer' }}
+                            onClick={() => onOpenUpdateModal && onOpenUpdateModal(latestFoundInfo)}
+                          >
+                            {isRu ? `Доступна ${latestFoundInfo.latestVersion}` : `Available ${latestFoundInfo.latestVersion}`}
+                          </Badge>
+                        )}
+                        {updateStatusText && !latestFoundInfo && (
+                          <Caption1 style={{ color: tokens.colorPaletteGreenForeground1 || tokens.colorBrandForeground1 }}>
+                            {updateStatusText}
+                          </Caption1>
+                        )}
+                      </div>
+
+                      <Switch
+                        checked={autoCheckUpdates}
+                        onChange={(_, data) => setAutoCheckUpdates(data.checked)}
+                        label={<span style={{ fontSize: '12px', color: tokens.colorNeutralForeground3 }}>{isRu ? 'Автопроверка при запуске' : 'Check on startup'}</span>}
+                      />
+                    </div>
+                  </div>
                 </div>
               </>
             ) : (
