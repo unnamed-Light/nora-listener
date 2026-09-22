@@ -31,6 +31,8 @@ struct RecordingSession {
     channels: u16,
     realtime_tx: Option<std::sync::mpsc::Sender<Vec<f32>>>,
     worker_handle: Option<std::thread::JoinHandle<()>>,
+    enhance_audio: bool,
+    agc_boost: String,
 }
 
 // Safety: cpal::Stream is safe to move and drop across threads on Windows WASAPI and is kept inside a Mutex.
@@ -160,6 +162,8 @@ fn realtime_worker_loop(
     config: RealtimeConfig,
     device_sample_rate: u32,
     channels: u16,
+    enhance_audio: bool,
+    agc_boost: String,
 ) {
     let client = match reqwest::blocking::Client::builder()
         .timeout(std::time::Duration::from_secs(12))
@@ -233,23 +237,27 @@ fn realtime_worker_loop(
             mono_samples
         };
 
-        // Normalization
-        let mut max_peak: f32 = 0.0;
-        for &s in &resampled {
-            let abs = s.abs();
-            if abs > max_peak {
-                max_peak = abs;
-            }
-        }
-
-        if max_peak < 0.0005 {
-            return None;
-        }
-
+        // DSP 2.0 Speech Enhancement & Normalization
         let mut normalized = resampled;
-        let gain = (0.92 / max_peak).min(25.0);
-        for s in &mut normalized {
-            *s = (*s * gain).clamp(-1.0, 1.0);
+        if enhance_audio {
+            crate::dsp_chain::enhance_speech_audio(&mut normalized, target_rate, &agc_boost);
+        } else {
+            let mut max_peak: f32 = 0.0;
+            for &s in &normalized {
+                let abs = s.abs();
+                if abs > max_peak {
+                    max_peak = abs;
+                }
+            }
+
+            if max_peak < 0.0005 {
+                return None;
+            }
+
+            let gain = (0.92 / max_peak).min(25.0);
+            for s in &mut normalized {
+                *s = (*s * gain).clamp(-1.0, 1.0);
+            }
         }
 
         // Encode to WAV in memory
@@ -367,15 +375,19 @@ fn realtime_worker_loop(
     };
 
     while let Ok(raw_block) = rx.recv() {
-        // Calculate RMS of incoming block (mono approximation for VAD)
-        let mut sum_sq = 0.0f32;
-        for &s in &raw_block {
-            sum_sq += s * s;
-        }
-        let rms = (sum_sq / raw_block.len().max(1) as f32).sqrt();
+        // Voice Activity Detection (VAD)
+        let (_rms, speech_detected) = if enhance_audio {
+            crate::dsp_chain::calculate_adaptive_vad_threshold(&raw_block)
+        } else {
+            let mut sum_sq = 0.0f32;
+            for &s in &raw_block {
+                sum_sq += s * s;
+            }
+            let rms = (sum_sq / raw_block.len().max(1) as f32).sqrt();
+            (rms, rms > 0.012)
+        };
 
-        // VAD threshold
-        if rms > 0.012 {
+        if speech_detected {
             has_speech = true;
             consecutive_silence_samples = 0;
         } else {
@@ -428,11 +440,16 @@ pub fn start_recording(
     app: AppHandle,
     device_id: Option<String>,
     realtime_config: Option<RealtimeConfig>,
+    enhance_audio: Option<bool>,
+    agc_boost: Option<String>,
 ) -> Result<(), String> {
     let mut session_lock = CURRENT_SESSION.lock().map_err(|e| e.to_string())?;
     if session_lock.is_some() {
         return Err("Запись уже запущена".to_string());
     }
+
+    let is_enhanced = enhance_audio.unwrap_or(true);
+    let boost_mode = agc_boost.unwrap_or_else(|| "high".to_string());
 
     let host = cpal::default_host();
     let device: Device = if let Some(target_id) = device_id.filter(|s| !s.trim().is_empty() && s != "default") {
@@ -468,10 +485,12 @@ pub fn start_recording(
     let (realtime_tx, worker_handle) = if let Some(cfg) = realtime_config.filter(|c| c.enabled && !c.api_key.trim().is_empty()) {
         let (tx, rx) = std::sync::mpsc::channel::<Vec<f32>>();
         let app_worker = app.clone();
+        let is_enhanced_clone = is_enhanced;
+        let boost_mode_clone = boost_mode.clone();
         let handle = std::thread::Builder::new()
             .name("nora-realtime-worker".to_string())
             .spawn(move || {
-                realtime_worker_loop(rx, app_worker, cfg, sample_rate, channels);
+                realtime_worker_loop(rx, app_worker, cfg, sample_rate, channels, is_enhanced_clone, boost_mode_clone);
             })
             .map_err(|e| format!("Ошибка запуска воркера реального времени: {}", e))?;
         app.emit("transcription-log", "[Транскрибация в реальном времени] Фоновый потоковый воркер активен".to_string()).ok();
@@ -596,6 +615,8 @@ pub fn start_recording(
         channels,
         realtime_tx,
         worker_handle,
+        enhance_audio: is_enhanced,
+        agc_boost: boost_mode,
     });
 
     Ok(())
@@ -665,9 +686,11 @@ pub fn stop_recording(app: AppHandle) -> Result<String, String> {
     let is_silence = max_peak < 0.0005;
     let duration_sec = resampled.len() as f32 / target_rate as f32;
 
-    // Normalization: amplify signal up to ~0.92 peak so Whisper hears speech clearly
+    // Normalization & DSP 2.0 Speech Enhancement
     let mut normalized = resampled;
-    if max_peak > 0.0005 {
+    if session.enhance_audio {
+        crate::dsp_chain::enhance_speech_audio(&mut normalized, target_rate, &session.agc_boost);
+    } else if max_peak > 0.0005 {
         let gain = (0.92 / max_peak).min(30.0);
         for s in &mut normalized {
             *s = (*s * gain).clamp(-1.0, 1.0);
@@ -703,7 +726,12 @@ pub fn stop_recording(app: AppHandle) -> Result<String, String> {
     if is_silence {
         app.emit("transcription-log", format!("[Звукозапись] Внимание: Записана тишина (пик {:.4}). Проверьте настройки микрофона в Windows.", max_peak)).ok();
     } else {
-        app.emit("transcription-log", format!("[Звукозапись] Запись завершена ({:.1} сек, сигнал {:.0}%). Сохранено: {}", duration_sec, max_peak * 100.0, filename)).ok();
+        let mode_desc = if session.enhance_audio {
+            format!("DSP 2.0 [{}]", session.agc_boost)
+        } else {
+            "Стандарт".to_string()
+        };
+        app.emit("transcription-log", format!("[Звукозапись] Запись завершена ({:.1} сек, сигнал {:.0}%, {}). Сохранено: {}", duration_sec, max_peak * 100.0, mode_desc, filename)).ok();
     }
 
     Ok(abs_path)

@@ -9,7 +9,7 @@ import {
   Delete20Regular, Key20Regular, Globe20Regular, Info20Regular,
   Open16Regular, Checkmark16Regular, WeatherSunny20Regular, WeatherMoon20Regular,
   Sparkle20Regular,
-  ArrowSync20Regular, ArrowUndo16Regular, Mic20Regular
+  ArrowSync20Regular, ArrowUndo16Regular, Mic20Regular, Speaker220Regular
 } from '@fluentui/react-icons';
 import { useAppStore } from '../store/appStore';
 import { openExternalUrl } from '../lib/openUrl';
@@ -164,7 +164,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, l
     realtimeTranscriptionEnabled, setRealtimeTranscriptionEnabled,
     realtimeModel, setRealtimeModel,
     realtimeChunkWindow, setRealtimeChunkWindow,
-    realtimeVadSensitivity, setRealtimeVadSensitivity
+    realtimeVadSensitivity, setRealtimeVadSensitivity,
+    audioEnhanceEnabled, setAudioEnhanceEnabled,
+    audioAgcBoost, setAudioAgcBoost
   } = useAppStore();
   const [activeTab, setActiveTab] = useState<'general' | 'prompt'>('general');
   const [showKey, setShowKey] = useState<boolean>(false);
@@ -183,7 +185,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, l
     setUpdateStatusText(null);
     setLatestFoundInfo(null);
     try {
-      const info = await checkForUpdates('1.1.0');
+      const info = await checkForUpdates('1.2.0');
       if (info.hasUpdate) {
         setLatestFoundInfo(info);
         if (onOpenUpdateModal) {
@@ -502,6 +504,76 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, l
 
                 <Divider />
 
+                {/* Audio Enhancement (DSP 2.0 & AGC) Section */}
+                <div className={styles.section}>
+                  <div className={styles.sectionTitleRow}>
+                    <div className={styles.sectionHeader}>
+                      <Speaker220Regular style={{ color: tokens.colorBrandForeground1 }} />
+                      <Body1Strong>{isRu ? 'Улучшение звука и микрофона (DSP 2.0 & AGC)' : 'Audio Enhancement & AGC (DSP 2.0)'}</Body1Strong>
+                    </div>
+                    {audioEnhanceEnabled ? (
+                      <Badge appearance="filled" color="brand" size="small">
+                        {isRu ? 'Активно' : 'Active'}
+                      </Badge>
+                    ) : (
+                      <Badge appearance="tint" color="subtle" size="small">
+                        {isRu ? 'Выключено' : 'Disabled'}
+                      </Badge>
+                    )}
+                  </div>
+
+                  <Caption1 style={{ color: tokens.colorNeutralForeground3 }}>
+                    {isRu
+                      ? 'Интеллектуальная обработка речи: полосовой фильтр Баттерворта (100–7500 Гц), мягкое шумоподавление и адаптивный компрессор тихой речи для лекций издалека:'
+                      : 'Speech enhancement pipeline: Butterworth bandpass filter (100-7500 Hz), noise reduction, and adaptive AGC for distant lecturer speech:'}
+                  </Caption1>
+
+                  <div style={{ marginTop: '4px' }}>
+                    <Switch
+                      checked={audioEnhanceEnabled}
+                      onChange={(_, data) => setAudioEnhanceEnabled(data.checked)}
+                      label={isRu ? 'Включить фильтрацию шума и адаптивное усиление речи' : 'Enable noise filtering and adaptive speech boost'}
+                    />
+                  </div>
+
+                  {audioEnhanceEnabled && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '8px', paddingLeft: '4px' }}>
+                      <div style={{ maxWidth: '420px' }}>
+                        <Caption1 style={{ display: 'block', marginBottom: '4px', fontWeight: 600, color: tokens.colorNeutralForeground2 }}>
+                          {isRu ? 'Интенсивность усиления далекого голоса (AGC Boost):' : 'Distant voice boost intensity (AGC Boost):'}
+                        </Caption1>
+                        <Select
+                          value={audioAgcBoost}
+                          onChange={(_, data) => setAudioAgcBoost(data.value as any)}
+                          size="medium"
+                          style={{ width: '100%' }}
+                        >
+                          <option value="standard">
+                            {isRu ? 'Стандартный (+18 дБ, тихая комната / микрофон вблизи)' : 'Standard (+18 dB, quiet room / nearby mic)'}
+                          </option>
+                          <option value="high">
+                            {isRu ? 'Высокий (+23.5 дБ, рекомендуется для лекций и аудиторий)' : 'High (+23.5 dB, recommended for lecture halls)'}
+                          </option>
+                          <option value="ultra">
+                            {isRu ? 'Максимальный (+28 дБ, очень далекий лектор / слабый микрофон)' : 'Ultra (+28 dB, very distant lecturer / weak mic)'}
+                          </option>
+                        </Select>
+                      </div>
+
+                      <div className={styles.callout}>
+                        <Info20Regular style={{ flexShrink: 0, marginTop: '2px', color: tokens.colorNeutralForeground3 }} />
+                        <Caption1 style={{ color: tokens.colorNeutralForeground2, lineHeight: '1.45' }}>
+                          {isRu
+                            ? 'Фильтр Баттерворта 100 Гц срезает гул вентилятора ноутбука и вибрации стола, а компрессор поднимает тихий голос лектора без хрипа и искажений. Громкие звуки рядом (стук, кашель) автоматически ограничиваются лимитером.'
+                            : 'Butterworth 100 Hz filter cuts laptop fan rumble and desk thumps, while AGC lifts quiet voices without clipping. Sudden loud sounds are safely limited.'}
+                        </Caption1>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <Divider />
+
                 {/* About Section */}
                 <div className={styles.section}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
@@ -516,7 +588,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, l
                         <Body1Strong>{isRu ? 'О программе' : 'About Application'}</Body1Strong>
                       </div>
                       <Body1 style={{ fontSize: '13px', color: tokens.colorNeutralForeground2 }}>
-                        Nora Listener — v1.1.0
+                        Nora Listener — v1.2.0
                       </Body1>
                     </div>
                   </div>

@@ -9,6 +9,7 @@ export type LectureSortOrder = 'date-desc' | 'date-asc' | 'title-asc' | 'title-d
 export type RealtimeModel = 'whisper-large-v3-turbo' | 'whisper-large-v3';
 export type RealtimeWindow = 4 | 7 | 10;
 export type VadSensitivity = 400 | 700 | 1200;
+export type AudioAgcBoost = 'standard' | 'high' | 'ultra';
 
 export const DEFAULT_NORA_PROMPT = "Ты — Нора, персональный академический ИИ-ассистент и внимательный конспектировщик лекций приложения «Nora Listener».\nТвоя цель — составить подробный, исчерпывающий и структурированный конспект лекции строго по тексту аудиозаписи в формате Markdown на русском языке.\n\nОБЯЗАТЕЛЬНЫЕ ПРАВИЛА:\n1. Пиши максимально подробно, развернуто и обстоятельно. Ни в коем случае не сокращай изложение лекции, подробно раскрывай все пункты, понятия, примеры и подразделы 3.1–3.4. Обязательно раскрой все 5 разделов (§ 1 – § 5).\n2. СТРОГО ЗАПРЕЩЕНО ИСПОЛЬЗОВАТЬ ЭМОДЗИ И СМАЙЛИКИ! Для оформления используй исключительно строгие типографские символы (§, •, —, ◆, -).\n3. СТРОГО ЗАПРЕЩЕНО выводить теги <think>, <thought> или внутренние служебные рассуждения. Начинай ответ СРАЗУ с заголовка первого уровня (#).\n4. МАТЕМАТИЧЕСКАЯ РАЗМЕТКА: Все математические формулы, переменные, множества, отношения и кванторы оформляй СТРОГО в стандартном синтаксисе LaTeX ($...$ для строчных и $$...$$ для вынесенных формул). Категорически запрещено оставлять формулы простым текстом без знаков доллара.\n5. СТРОГАЯ ЗАВЕРШЕННОСТЬ ВСЕХ РАЗДЕЛОВ: Ответ обязан быть ПОЛНОСТЬЮ завершенным, целостным и законченным. Категорически запрещено обрывать текст или оставлять разделы недописанными! Обязательно раскрой все 5 разделов (§ 1 – § 5) и заверши конспект финальной строкой *Конспект сформирован Норой. Успехов в подготовке к занятиям и экзаменам!*.\n\nОБЯЗАТЕЛЬНАЯ СТРУКТУРА КОНСПЕКТА:\n# [Название темы лекции (сформулируй по реальным словам лектора)]\n\n## § 1. Главные тезисы и фундаментальные идеи лекции\n(Выдели 4–6 ключевых концепций лектора. Каждый тезис оформи развернутым абзацем с объяснением сути, логики и аргументации преподавателя, а не просто короткой фразой.)\n\n## § 2. Ключевые термины и понятийный аппарат\n(Приведи строгие академические определения ВСЕХ упомянутых в лекции терминов, понятий, теорем и законов с математическими обозначениями и свойствами.)\n\n## § 3. Подробное аналитическое содержание\n(Разбей материал лекции на 2–4 логических подраздела 3.1, 3.2, ... и максимально обстоятельно, абзац за абзацем, изложи предпосылки, выкладки, примеры, свойства, доказательства и классификации, которые озвучил лектор.)\n\n## § 4. Акценты лектора, нюансы и частые ошибки\n(Отрази важные замечания лектора, практические советы, типичные ошибки студентов на экзаменах, тонкости определений и нюансы, на которые преподаватель обращал особое внимание аудитории.)\n\n## § 5. Вопросы для глубокой самопроверки к экзамену от Норы\n(Сформулируй 5–7 содержательных вопросов для подготовки к коллоквиуму или экзамену, проверяющих понимание сути темы, с краткими подсказками, на что обратить внимание при ответе.)";
 
@@ -33,6 +34,8 @@ interface AppState {
   autoCheckUpdates: boolean;
   ignoredUpdateVersion: string | null;
   lastUpdateCheckTime: number | null;
+  audioEnhanceEnabled: boolean;
+  audioAgcBoost: AudioAgcBoost;
   toggleTheme: () => void;
   setAiMode: (mode: AiMode) => void;
   setLanguage: (lang: Language) => void;
@@ -54,6 +57,8 @@ interface AppState {
   setAutoCheckUpdates: (enabled: boolean) => void;
   setIgnoredUpdateVersion: (version: string | null) => void;
   setLastUpdateCheckTime: (time: number | null) => void;
+  setAudioEnhanceEnabled: (enabled: boolean) => void;
+  setAudioAgcBoost: (boost: AudioAgcBoost) => void;
 }
 
 export const useAppStore = create<AppState>()(
@@ -79,6 +84,8 @@ export const useAppStore = create<AppState>()(
       autoCheckUpdates: true,
       ignoredUpdateVersion: null,
       lastUpdateCheckTime: null,
+      audioEnhanceEnabled: true,
+      audioAgcBoost: 'high',
       toggleTheme: () => set((state) => ({ theme: state.theme === 'light' ? 'dark' : 'light' })),
       setAiMode: (mode) => set({ aiMode: mode }),
       setLanguage: (lang) => set({ language: lang }),
@@ -100,6 +107,8 @@ export const useAppStore = create<AppState>()(
       setAutoCheckUpdates: (enabled) => set({ autoCheckUpdates: enabled }),
       setIgnoredUpdateVersion: (version) => set({ ignoredUpdateVersion: version }),
       setLastUpdateCheckTime: (time) => set({ lastUpdateCheckTime: time }),
+      setAudioEnhanceEnabled: (enabled) => set({ audioEnhanceEnabled: enabled }),
+      setAudioAgcBoost: (boost) => set({ audioAgcBoost: boost }),
     }),
     {
       name: 'app-store',

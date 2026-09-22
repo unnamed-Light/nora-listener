@@ -111,59 +111,8 @@ pub fn preprocess_audio_signal(samples: &mut [f32], sample_rate: u32) {
     if samples.is_empty() {
         return;
     }
-
-    // 1. High-Pass Filter (Butterworth 2nd-order at 80 Hz) to eliminate DC-offset and low-frequency rumble
-    let fs = sample_rate as f32;
-    let fc = 80.0f32;
-    let q = 0.7071f32;
-
-    let w0 = 2.0 * std::f32::consts::PI * fc / fs;
-    let alpha = w0.sin() / (2.0 * q);
-    let cos_w0 = w0.cos();
-
-    let b0 = (1.0 + cos_w0) / 2.0;
-    let b1 = -(1.0 + cos_w0);
-    let b2 = (1.0 + cos_w0) / 2.0;
-    let a0 = 1.0 + alpha;
-    let a1 = -2.0 * cos_w0;
-    let a2 = 1.0 - alpha;
-
-    let b0_norm = b0 / a0;
-    let b1_norm = b1 / a0;
-    let b2_norm = b2 / a0;
-    let a1_norm = a1 / a0;
-    let a2_norm = a2 / a0;
-
-    let mut x1 = 0.0f32;
-    let mut x2 = 0.0f32;
-    let mut y1 = 0.0f32;
-    let mut y2 = 0.0f32;
-    let mut max_abs = 0.0f32;
-
-    for s in samples.iter_mut() {
-        let x0 = *s;
-        let y0 = b0_norm * x0 + b1_norm * x1 + b2_norm * x2 - a1_norm * y1 - a2_norm * y2;
-
-        x2 = x1;
-        x1 = x0;
-        y2 = y1;
-        y1 = y0;
-
-        *s = y0;
-
-        let abs_val = y0.abs();
-        if abs_val > max_abs {
-            max_abs = abs_val;
-        }
-    }
-
-    // 2. Peak normalization to 0.92 (-0.7 dBFS) for quiet recordings
-    if max_abs > 0.001 && max_abs < 0.85 {
-        let gain = (0.92 / max_abs).min(8.0);
-        for s in samples.iter_mut() {
-            *s = (*s * gain).clamp(-1.0, 1.0);
-        }
-    }
+    // High-pass 100 Hz, low-pass 7500 Hz, AGC RMS makeup gain (+23.5 dB) and soft-knee limiter
+    crate::dsp_chain::enhance_speech_audio(samples, sample_rate, "high");
 }
 use hound::WavReader;
 // https://github.com/openai/whisper/blob/main/whisper/model.py/rgs

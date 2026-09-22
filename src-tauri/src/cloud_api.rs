@@ -61,7 +61,7 @@ pub fn transcribe_cloud(
     };
 
     app.emit("transcription-log", format!("[Режим распознавания] {}", mode_title)).ok();
-    app.emit("transcription-log", "Декодирование аудиофайла и DSP-очистка (High-Pass 80 Гц + нормализация громкости)...").ok();
+    app.emit("transcription-log", "Декодирование аудиофайла и обработка DSP 2.0 (полосовой фильтр 100-7500 Гц + AGC компрессор речи)...").ok();
 
     let (pcm_data, sample_rate) = crate::whisper_candle::pcm_decode(audio_path)?;
 

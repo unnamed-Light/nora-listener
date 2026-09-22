@@ -3,6 +3,7 @@ pub mod cloud_api;
 pub mod native_audio;
 pub mod diarization;
 pub mod update_checker;
+pub mod dsp_chain;
 
 
 
@@ -16,8 +17,10 @@ fn start_native_recording(
     app: tauri::AppHandle,
     device_id: Option<String>,
     realtime_config: Option<native_audio::RealtimeConfig>,
+    enhance_audio: Option<bool>,
+    agc_boost: Option<String>,
 ) -> Result<(), String> {
-    native_audio::start_recording(app, device_id, realtime_config)
+    native_audio::start_recording(app, device_id, realtime_config, enhance_audio, agc_boost)
 }
 
 #[tauri::command]

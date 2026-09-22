@@ -2,7 +2,7 @@
 
 [English](ARCHITECTURE_EN.md) | [Русский](ARCHITECTURE.md)
 
-This document provides an in-depth engineering breakdown of the architectural decisions, algorithms, data processing pipelines, and technology stack powering Nora Listener (v1.1.0).
+This document provides an in-depth engineering breakdown of the architectural decisions, algorithms, data processing pipelines, and technology stack powering Nora Listener (v1.2.0).
 
 ---
 
@@ -70,12 +70,21 @@ Real-time audio streaming is implemented using the `cpal` crate interfacing with
 - **Throttled spectral visualization**: Amplitude peak measurements dispatched to the UI visualizer are rate-limited to 40 ms intervals (~25 FPS) to eliminate IPC event queue saturation.
 - **Lossless WAV packaging**: Upon stopping recording, the buffer is serialized via `hound` into a standard 16-bit PCM WAV stored securely in `app_data_dir/recordings/`.
 
-### 2.3. Pre-Recognition Signal Conditioning (DSP)
-Before passing audio to the acoustic models, two DSP stages are executed:
-1. **High-Pass Filter (80 Hz)**:
-   University lecture halls suffer from low-frequency ambient rumble: ventilation HVAC, projector fan hum, desk vibration, and 50/60 Hz AC electrical hum. Attenuating frequencies below 80 Hz cleans noise while preserving human speech formants (adult fundamental frequencies start around 85 Hz).
-2. **Peak Amplitude Normalization**:
-   The peak absolute sample value $A_{\max} = \max_{i} |x[i]|$ is computed. If $A_{\max} > 0$, samples are scaled by $k = \frac{0.95}{A_{\max}}$, ensuring optimal dynamic range for neural decoders without clipping.
+### 2.3. Pre-Recognition Signal Conditioning and Normalization (DSP 2.0, `dsp_chain.rs`)
+In v1.2.0, Nora Listener introduces a specialized speech processing pipeline addressing distant speech (5–15 meters) and laptop microphone limitations:
+1. **Speech Bandpass Filter**:
+   - **2nd-Order Butterworth High-Pass Filter (100 Hz)**:
+     Eliminates DC offset, laptop cooling fan chassis vibrations, desk rumble, and 50/60 Hz power grid hum.
+   - **2nd-Order Butterworth Low-Pass Filter (7500 Hz)**:
+     Attenuates electrical coil whine, high-frequency hiss, and quantization noise, restricting the bandwidth to human voice formants.
+   - Biquad section transfer function:
+     $$H(z) = \frac{b_0 + b_1 z^{-1} + b_2 z^{-2}}{1 + a_1 z^{-1} + a_2 z^{-2}}$$
+2. **Multi-Stage AGC & Limiter**:
+   - Continuous RMS envelope tracking with rapid attack ($40\text{ ms}$) to catch spoken syllables and smooth release ($400\text{ ms}$) to prevent noise pumping between words.
+   - **Adaptive Makeup Gain**: Distant, faint speech is amplified by up to $+18\text{ dB}$ (standard), $+23.5\text{ dB}$ (high, recommended for lecture halls), or $+28\text{ dB}$ (ultra) toward target $0.15\text{ RMS}$.
+   - **Soft-Knee Compressor and Brickwall Limiter**: Transient spikes near the microphone (coughs, door slams, keyboard clicks) are smoothed above $0.85\text{ FS}$ and brickwalled at $0.98\text{ FS}$, preventing clipping and distortion.
+3. **Dynamic Voice Activity Detection (VAD)**:
+   - Replaces the former static cutoff ($0.012$) with dynamic room noise floor tracking sensitive down to $0.0025\text{ RMS}$, preventing the accidental dropping of faint lecture phrases.
 
 ---
 
@@ -290,11 +299,23 @@ All document compilation occurs locally in the browser:
 - **Scoped Export Handlers**: Exporter functions accept `scope?: 'summary' | 'transcript' | 'both'` to dynamically produce targeted or concatenated files.
 - **Native File Dialogs**: Save paths are negotiated via `@tauri-apps/plugin-dialog` and written directly to disk via Rust IPC (`write_binary_file`).
 
+### 7.3. Automated Update Management Subsystem (`update_checker.rs`, `UpdateModal.tsx`)
+Starting in v1.2.0, Nora Listener includes an integrated release tracking pipeline linked to GitHub Releases:
+- **Two-Tier Architecture**:
+  - Native background Rust worker (`check_github_release`) communicates over TLS using `reqwest` directly with the GitHub Releases API (`/repos/unnamed-Light/nora-listener/releases/latest`).
+  - Fallback frontend fetch routine ensures connectivity across diverse operating environments.
+- **Strict SemVer Parser**:
+  - Robust version parsing supporting `v` prefixes, hotfix suffixes, and numerical major/minor/patch tuple comparison (`is_newer_version`).
+- **User Interface & Notifications**:
+  - Non-intrusive background check executed 3.5 seconds after application launch.
+  - Dedicated Fluent UI dialog (`UpdateModal.tsx`) displaying structured release notes, a direct GitHub release download action, and version-skipping preference.
+  - Manual check trigger in the Settings modal with live status indicators.
+
 ---
 
 ## 8. Summary and Architectural Conclusions
 
-The architecture of **Nora Listener v1.0.2** delivers a performant balance between local processing and cloud-accelerated intelligence:
-1. **Security and Privacy**: Audio capture, DSP noise reduction, spectral speaker diarization, and slide document ingestion (.docx, .pptx, .pdf) run 100% locally on the user's computer.
+The architecture of **Nora Listener v1.2.0** delivers a performant balance between local processing and cloud-accelerated intelligence:
+1. **Security and Privacy**: Audio capture, DSP 2.0 speech bandpass filtering, adaptive AGC, spectral speaker diarization, and slide document ingestion (.docx, .pptx, .pdf) run 100% locally on the user's computer.
 2. **Speed**: Delegating speech recognition and synthesis to Groq Cloud LPUs bypasses weak laptop GPUs, generating academic notes in seconds.
-3. **Ergonomics and Polish**: Persistent folder organization, full-row drag-and-drop, split view, selective multi-format export, and dynamic prompt customization provide a unified environment for university learning.
+3. **Ergonomics and Polish**: Persistent folder organization, bandpass speech isolation, distant voice AGC boost, full-row drag-and-drop, split view, selective multi-format export, and dynamic prompt customization provide a unified environment for university learning.

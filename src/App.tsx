@@ -531,6 +531,7 @@ function App() {
     theme, language, apiKey, lastSaveDirectory, selectedMicrophoneId, enableDiarization, recognitionMode,
     sidebarWidth, splitViewRatio,
     realtimeTranscriptionEnabled, realtimeModel, realtimeChunkWindow, realtimeVadSensitivity,
+    audioEnhanceEnabled, audioAgcBoost,
     toggleTheme, setLastSaveDirectory, setSelectedMicrophoneId, setEnableDiarization, setRecognitionMode,
     setSidebarWidth, setSplitViewRatio
   } = useAppStore();
@@ -562,7 +563,7 @@ function App() {
     if (!autoCheckUpdates) return;
     const timer = setTimeout(async () => {
       try {
-        const info = await checkForUpdates('1.1.0');
+        const info = await checkForUpdates('1.2.0');
         setLastUpdateCheckTime(Date.now());
         if (info.hasUpdate && info.latestVersion !== ignoredUpdateVersion) {
           setPendingUpdateInfo(info);
@@ -708,6 +709,8 @@ function App() {
       await invoke("start_native_recording", {
         deviceId: selectedMicrophoneId || null,
         realtimeConfig,
+        enhanceAudio: audioEnhanceEnabled ?? true,
+        agcBoost: audioAgcBoost || 'high',
       });
 
       setIsRecording(true);
