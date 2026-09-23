@@ -128,6 +128,7 @@ mod tests {
     #[test]
     fn test_is_newer_version() {
         assert!(is_newer_version("v1.1.1", "v1.1.0"));
+        assert!(is_newer_version("1.2.1", "1.2.0"));
         assert!(is_newer_version("1.2.0", "1.1.0"));
         assert!(is_newer_version("2.0.0", "1.9.9"));
         assert!(!is_newer_version("v1.1.0", "v1.1.0"));

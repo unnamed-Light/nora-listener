@@ -32,7 +32,7 @@ export function isNewerVersion(latestTag: string, currentTag: string): boolean {
   return l.patch > c.patch;
 }
 
-export async function checkForUpdates(currentVersion: string = '1.2.0'): Promise<UpdateInfo> {
+export async function checkForUpdates(currentVersion: string = '1.2.1'): Promise<UpdateInfo> {
   try {
     const result = await invoke<UpdateInfo>('check_for_updates');
     if (result && typeof result.hasUpdate === 'boolean') {

@@ -76,7 +76,7 @@ const useStyles = makeStyles({
     flexShrink: 1,
     minHeight: 0, 
     minWidth: 0,
-    height: 'calc(100vh - 53px)', 
+    height: '100%', 
     width: '100%',
     maxWidth: '100%',
     backgroundColor: tokens.colorNeutralBackground2, 
@@ -128,8 +128,9 @@ const useStyles = makeStyles({
     display: 'flex',
     flexDirection: 'row',
     flexGrow: 1,
+    flexShrink: 0,
     height: '100%',
-    minHeight: 0,
+    minHeight: '440px',
     minWidth: 0,
     width: '100%',
     boxSizing: 'border-box',
@@ -138,8 +139,10 @@ const useStyles = makeStyles({
   splitPane: {
     display: 'flex',
     flexDirection: 'column',
+    flexGrow: 1,
+    flexShrink: 0,
     height: '100%',
-    minHeight: 0,
+    minHeight: '420px',
     minWidth: '160px',
     boxSizing: 'border-box',
     overflow: 'hidden',
@@ -169,6 +172,19 @@ const useStyles = makeStyles({
     boxSizing: 'border-box', 
     overflowY: 'auto', 
     overflowX: 'hidden',
+    '&::-webkit-scrollbar': {
+      width: '8px',
+    },
+    '&::-webkit-scrollbar-track': {
+      backgroundColor: 'transparent',
+    },
+    '&::-webkit-scrollbar-thumb': {
+      backgroundColor: tokens.colorNeutralStroke2,
+      borderRadius: '4px',
+    },
+    '&::-webkit-scrollbar-thumb:hover': {
+      backgroundColor: tokens.colorNeutralStroke1,
+    },
   },
   inputRow: {
     display: 'grid',
@@ -276,13 +292,17 @@ const useStyles = makeStyles({
     justifyContent: 'space-between',
     flexShrink: 0, 
     borderBottom: `1px solid ${tokens.colorNeutralStroke2}`,
-    ...shorthands.padding('0', '0', '6px', '0'),
+    ...shorthands.padding('6px', '0', '8px', '0'),
     flexWrap: 'wrap',
     rowGap: '8px',
     columnGap: '8px',
     width: '100%',
     maxWidth: '100%',
     boxSizing: 'border-box',
+    position: 'sticky',
+    top: 0,
+    zIndex: 10,
+    backgroundColor: tokens.colorNeutralBackground3,
   },
   tabActions: { 
     display: 'flex', 
@@ -296,8 +316,8 @@ const useStyles = makeStyles({
     display: 'flex', 
     flexDirection: 'column', 
     flexGrow: 1, 
-    height: '100%', 
-    minHeight: 0,
+    flexShrink: 0,
+    minHeight: 'clamp(420px, 52vh, 850px)',
     minWidth: 0,
     maxWidth: '100%',
     ...shorthands.gap('8px'), 
@@ -306,27 +326,32 @@ const useStyles = makeStyles({
   },
   textareaWrapper: {
     flexGrow: 1, 
+    flexShrink: 0,
     height: '100%', 
-    minHeight: 0, 
-    minWidth: 0,
-    maxWidth: '100%',
+    minHeight: '380px', 
+    minWidth: 0, 
+    maxWidth: '100%', 
     display: 'flex', 
-    flexDirection: 'column',
-    boxSizing: 'border-box',
-    overflow: 'hidden',
+    flexDirection: 'column', 
+    boxSizing: 'border-box', 
+    overflow: 'hidden', 
     '& .fui-Textarea': {
-      flexGrow: 1, height: '100%', minHeight: 0, width: '100%', maxWidth: '100%', display: 'flex', flexDirection: 'column',
+      flexGrow: 1, height: '100%', minHeight: '380px !important', width: '100%', maxWidth: '100%', display: 'flex', flexDirection: 'column',
       boxSizing: 'border-box',
     },
     '& textarea': {
-      flexGrow: 1, height: '100% !important', minHeight: '100% !important', maxHeight: 'none !important',
+      flexGrow: 1, height: '100% !important', minHeight: '380px !important', maxHeight: 'none !important',
       resize: 'none', boxSizing: 'border-box',
       fontFamily: 'Consolas, "Cascadia Code", "Segoe UI", sans-serif',
       fontSize: '14px', lineHeight: '1.6', padding: '12px 14px',
     },
   },
   markdownPreview: {
-    flexGrow: 1, height: '100%', minHeight: 0, overflowY: 'auto',
+    flexGrow: 1, 
+    flexShrink: 0,
+    height: '100%', 
+    minHeight: '380px', 
+    overflowY: 'auto',
     ...shorthands.padding('20px', '28px'),
     backgroundColor: tokens.colorNeutralBackground1,
     ...shorthands.border('1px', 'solid', tokens.colorNeutralStroke1),
@@ -563,7 +588,7 @@ function App() {
     if (!autoCheckUpdates) return;
     const timer = setTimeout(async () => {
       try {
-        const info = await checkForUpdates('1.2.0');
+        const info = await checkForUpdates('1.2.1');
         setLastUpdateCheckTime(Date.now());
         if (info.hasUpdate && info.latestVersion !== ignoredUpdateVersion) {
           setPendingUpdateInfo(info);

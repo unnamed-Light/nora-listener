@@ -185,7 +185,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, l
     setUpdateStatusText(null);
     setLatestFoundInfo(null);
     try {
-      const info = await checkForUpdates('1.2.0');
+      const info = await checkForUpdates('1.2.1');
       if (info.hasUpdate) {
         setLatestFoundInfo(info);
         if (onOpenUpdateModal) {
@@ -588,7 +588,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, l
                         <Body1Strong>{isRu ? 'О программе' : 'About Application'}</Body1Strong>
                       </div>
                       <Body1 style={{ fontSize: '13px', color: tokens.colorNeutralForeground2 }}>
-                        Nora Listener — v1.2.0
+                        Nora Listener — v1.2.1
                       </Body1>
                     </div>
                   </div>

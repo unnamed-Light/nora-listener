@@ -2,7 +2,7 @@
 
 [English](ARCHITECTURE_EN.md) | [Русский](ARCHITECTURE.md)
 
-This document provides an in-depth engineering breakdown of the architectural decisions, algorithms, data processing pipelines, and technology stack powering Nora Listener (v1.2.0).
+This document provides an in-depth engineering breakdown of the architectural decisions, algorithms, data processing pipelines, and technology stack powering Nora Listener (v1.2.1).
 
 ---
 
@@ -269,6 +269,15 @@ Equations render through a dual-phase pipeline:
 
 ---
 
+### 6.4. Adaptive Workspace Geometry and Scrollable Main Window (v1.2.1)
+Version 1.2.1 completely re-engineers the layout model of the main content canvas:
+- **Editor Compression Under Active Feature Panels**: When all top controls are visible simultaneously (dropzone/recording card, microphone select, transcription mode toggles, `ContextPanel`, `ClarifyingPromptPanel`, in-document search toolbar, and speaker diarization badges), the cumulative height of controls reaches ~450–550 px. Previously, flexbox compressed the editor container (`textareaContainer`) down to an unreadable 50–100 px slit without triggering container scrolling.
+- **Guaranteed Viewport Clamping (`clamp(420px, 52vh, 850px)`)**: The `textareaContainer` now enforces `minHeight: clamp(420px, 52vh, 850px)` and `flexShrink: 0`. Child containers (`textareaWrapper`, `markdownPreview`, `splitContainer`, `splitPane`) enforce minimum heights of 380 px to 440 px, making it impossible for the document workspace to shrink below comfortable readability.
+- **Seamless Main Window Scrolling (`overflowY: 'auto'`)**: The `mainContent` canvas incorporates uninhibited vertical scrolling with custom Fluent-styled scrollbars (`tokens.colorNeutralStroke2`). When the combined height of open control panels and the document editor exceeds the window height, the whole page scrolls smoothly.
+- **Sticky Tab & Action Header (`sticky tabRow`)**: The tab navigation bar (Full Transcript, Smart Notes, Split View) and primary action controls (Generate Notes, Export) utilize `position: sticky; top: 0; zIndex: 10` with an opaque background. As the user scrolls down through feature panels, the action bar stays pinned to the top of the canvas for immediate access without needing to scroll back up.
+
+---
+
 ## 7. Data Persistence and Export Subsystem
 
 ### 7.1. Relational Zustand Hierarchy (`historyStore.ts`)
@@ -315,7 +324,7 @@ Starting in v1.2.0, Nora Listener includes an integrated release tracking pipeli
 
 ## 8. Summary and Architectural Conclusions
 
-The architecture of **Nora Listener v1.2.0** delivers a performant balance between local processing and cloud-accelerated intelligence:
+The architecture of **Nora Listener v1.2.1** delivers a performant balance between local processing and cloud-accelerated intelligence:
 1. **Security and Privacy**: Audio capture, DSP 2.0 speech bandpass filtering, adaptive AGC, spectral speaker diarization, and slide document ingestion (.docx, .pptx, .pdf) run 100% locally on the user's computer.
 2. **Speed**: Delegating speech recognition and synthesis to Groq Cloud LPUs bypasses weak laptop GPUs, generating academic notes in seconds.
 3. **Ergonomics and Polish**: Persistent folder organization, bandpass speech isolation, distant voice AGC boost, full-row drag-and-drop, split view, selective multi-format export, and dynamic prompt customization provide a unified environment for university learning.
