@@ -64,16 +64,10 @@ pub fn pcm_decode(path: &str) -> anyhow::Result<(Vec<f32>, u32)> {
                     
                     if channels == 1 {
                         samples.extend_from_slice(interleaved);
-                    } else if channels == 2 {
-                        // Mix to mono
-                        for chunk in interleaved.chunks_exact(2) {
-                            samples.push((chunk[0] + chunk[1]) / 2.0);
-                        }
                     } else {
-                        // Take first channel
-                        for chunk in interleaved.chunks_exact(channels) {
-                            samples.push(chunk[0]);
-                        }
+                        // Extract primary channel to avoid phase comb cancellation on stereo audio
+                        let mono = crate::dsp_chain::extract_primary_mono_channel(interleaved, channels);
+                        samples.extend_from_slice(&mono);
                     }
                 }
             }
@@ -83,27 +77,12 @@ pub fn pcm_decode(path: &str) -> anyhow::Result<(Vec<f32>, u32)> {
         }
     }
 
-    // Now resample to 16000 if needed (Linear interpolation)
+    // Resample to 16,000 Hz if needed with 4th-order anti-aliasing filter and cubic Hermite interpolation
     if sample_rate != 16000 {
-        let mut resampled = Vec::new();
-        let ratio = sample_rate as f64 / 16000.0;
-        let new_len = (samples.len() as f64 / ratio) as usize;
-        for i in 0..new_len {
-            let src_idx = i as f64 * ratio;
-            let mut idx_floor = src_idx.floor() as usize;
-            if idx_floor >= samples.len() {
-                idx_floor = samples.len().saturating_sub(1);
-            }
-            let idx_ceil = (idx_floor + 1).min(samples.len().saturating_sub(1));
-            let frac = (src_idx - idx_floor as f64) as f32;
-            let val = samples[idx_floor] * (1.0 - frac) + samples[idx_ceil] * frac;
-            resampled.push(val);
-        }
-        preprocess_audio_signal(&mut resampled, 16000);
+        let resampled = crate::dsp_chain::resample_to_16k(&samples, sample_rate);
         return Ok((resampled, 16000));
     }
 
-    preprocess_audio_signal(&mut samples, sample_rate);
     Ok((samples, sample_rate))
 }
 

@@ -47,6 +47,7 @@ pub fn transcribe_cloud(
     app: &tauri::AppHandle,
     enable_diarization: bool,
     mode: &str,
+    distance_mode: Option<&str>,
 ) -> anyhow::Result<String> {
     let whisper_model = if mode == "speed" || mode == "cloud-speed" || mode == "turbo" {
         "whisper-large-v3-turbo"
@@ -61,9 +62,19 @@ pub fn transcribe_cloud(
     };
 
     app.emit("transcription-log", format!("[Режим распознавания] {}", mode_title)).ok();
-    app.emit("transcription-log", "Декодирование аудиофайла и обработка DSP 2.0 (полосовой фильтр 100-7500 Гц + AGC компрессор речи)...").ok();
 
-    let (pcm_data, sample_rate) = crate::whisper_candle::pcm_decode(audio_path)?;
+    let (mut pcm_data, sample_rate) = crate::whisper_candle::pcm_decode(audio_path)?;
+
+    // Check if audio file was already processed by Nora's native recording session
+    let is_internal_recording = audio_path.contains("recordings") || audio_path.contains("Запись_");
+    let dist_profile = distance_mode.unwrap_or("medium");
+
+    if !is_internal_recording {
+        app.emit("transcription-log", format!("[DSP 2.1] Обработка внешнего файла (профиль дистанции: {})", dist_profile)).ok();
+        crate::dsp_chain::enhance_speech_audio(&mut pcm_data, sample_rate, dist_profile);
+    } else {
+        app.emit("transcription-log", "[DSP 2.1] Нативная запись микрофона: используется оптимизированный звуковой поток без повторного перегруза").ok();
+    }
 
     let diar_res = if enable_diarization {
         app.emit("transcription-log", "[Акустическая диаризация] Анализ звуковой волны (высота тона F0, форманты и тембр)...").ok();
@@ -94,7 +105,7 @@ pub fn transcribe_cloud(
     app.emit("transcription-log", format!("Аудио разбито на {} частей по 10 мин. Скорость Groq Whisper: ~x200", total_chunks)).ok();
 
     let mut last_speaker: Option<usize> = None;
-    let base_academic_prompt = "Академическая лекция в университете. Преподаватель объясняет материал студентам. Высшая математика, дискретная математика, алгоритмы, программирование, русский язык, формулы, термины, определения, правила, примеры, теоремы. Четкая пунктуация, терминология, заглавные буквы: ";
+    let base_academic_prompt = "Академическая университетская лекция. Преподаватель объясняет материал студентам. Научная терминология, определения, правила, формулы, примеры, четкая русская речь и пунктуация: ";
     let mut previous_tail = String::new();
 
     for (i, chunk) in chunks.into_iter().enumerate() {

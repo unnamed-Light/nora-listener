@@ -781,38 +781,49 @@ export const UserGuideModal: React.FC<UserGuideModalProps> = ({ isOpen, onClose,
             </div>
 
             <div className={styles.sectionCard}>
-              <Subtitle2>{isEn ? 'Built-in Audio Enhancement Pipeline (DSP):' : 'Встроенный алгоритм очистки звука (DSP Pipeline):'}</Subtitle2>
+              <Subtitle2>{isEn ? 'Built-in Audio Enhancement Pipeline (DSP 2.1):' : 'Встроенный алгоритм очистки звука и адаптации к дистанции (DSP 2.1):'}</Subtitle2>
               <ul className={styles.bulletList}>
                 <li>
                   {isEn ? (
                     <>
-                      <Body1Strong>80 Hz Butterworth High-Pass Filter:</Body1Strong> cuts out low-frequency hall hum, ventilation noise, desk vibrations from recording devices, and microphone breath sounds, preserving the entire spectrum of intelligible human speech.
+                      <Body1Strong>Anti-Phase Laptop Microphone Protection:</Body1Strong> extracts the discrete primary capsule (Channel 0) instead of destructive (L + R) / 2 summing, preventing acoustic comb-filtering phase cancellation in the 1.5–4 kHz speech formant band.
                     </>
                   ) : (
                     <>
-                      <Body1Strong>Высокочастотный фильтр Баттерворта 80 Гц (80 Hz Butterworth High-Pass):</Body1Strong> отсекает низкочастотные гулы аудитории, шум вентиляции, вибрации стола от диктофона и дыхание в микрофон, сохраняя весь спектр человеческого голоса.
+                      <Body1Strong>Защита от противофазы микрофонов ноутбука:</Body1Strong> приложение берет первичный физический капсюль микрофона (Channel 0) вместо разрушительного суммирования (L + R) / 2, устраняя фазовую гребенчатую фильтрацию в речевом диапазоне 1.5–4 кГц.
                     </>
                   )}
                 </li>
                 <li>
                   {isEn ? (
                     <>
-                      <Body1Strong>Peak Normalization (0.92 Gain):</Body1Strong> automatically normalizes signal levels for quiet recordings captured from back rows, ensuring clear audibility for the Whisper neural network.
+                      <Body1Strong>Steep 4th-Order Butterworth Anti-Aliasing (7.2 kHz) & Cubic Hermite Resampling:</Body1Strong> ensures clean downsampling from 44.1/48 kHz to 16 kHz without folding ultrasonic noise into audible speech frequencies.
                     </>
                   ) : (
                     <>
-                      <Body1Strong>Пиковая нормализация громкости (0.92 Gain):</Body1Strong> автоматически выравнивает уровень сигнала тихих записей, сделанных с задних рядов аудитории, гарантируя четкую слышимость для нейросети Whisper.
+                      <Body1Strong>Антиалиасинговый фильтр 4-го порядка (7.2 кГц) и кубическая интерполяция Эрмита:</Body1Strong> гарантирует чистое понижение частоты дискретизации до 16 кГц без зеркальных искажений согласных звуков.
                     </>
                   )}
                 </li>
                 <li>
                   {isEn ? (
                     <>
-                      <Body1Strong>Streaming 16 kHz Mono Conversion:</Body1Strong> native audio optimization for minimal RAM consumption and maximum processing speed.
+                      <Body1Strong>Distance Profiles («Близко» | «Средне» | «Далеко»):</Body1Strong> selector right on the main toolbar. Mode «Близко (1-3 м)» uses gentle peak normalization to -3 dBFS without compressor distortion for front-row students.
                     </>
                   ) : (
                     <>
-                      <Body1Strong>Потоковая конвертация в моно 16 кГц:</Body1Strong> нативная оптимизация для минимального расхода оперативной памяти.
+                      <Body1Strong>Профили дистанции до лектора («Близко» | «Средне» | «Далеко»):</Body1Strong> селектор расположен прямо на главной панели управления. Режим «Близко (1-3 м)» применяет бережную нормализацию до -3 dBFS без компрессии и клиппинга для первых парт.
+                    </>
+                  )}
+                </li>
+                <li>
+                  {isEn ? (
+                    <>
+                      <Body1Strong>Elimination of Double Processing:</Body1Strong> recorded audio is optimized exactly once upon saving, delivering pristine dynamic range directly to the Whisper decoder.
+                    </>
+                  ) : (
+                    <>
+                      <Body1Strong>Устранение повторной обработки:</Body1Strong> аудиопоток нормализуется ровно один раз при сохранении, благодаря чему нейросеть Whisper получает чистый звук с естественной динамикой без перегруза.
                     </>
                   )}
                 </li>
@@ -872,6 +883,44 @@ export const UserGuideModal: React.FC<UserGuideModalProps> = ({ isOpen, onClose,
                     {isEn
                       ? 'Both recognition modes run via the high-speed Groq API, transcribing a 90-minute lecture in just 15-30 seconds with an active internet connection and a configured Groq API key.'
                       : 'Оба режима распознавания выполняются через высокоскоростной API Groq, расшифровывая полуторачасовую лекцию всего за 15–30 секунд при наличии интернет-подключения и ключа Groq API.'}
+                  </Body1>
+                </div>
+              </div>
+            </div>
+
+            <div className={styles.sectionCard}>
+              <Subtitle2>{isEn ? 'Distance Profiles to Lecturer:' : 'Профили дистанции до преподавателя:'}</Subtitle2>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                  <Body1Strong style={{ display: 'block' }}>
+                    {isEn ? '«Близко (1-3 м)» (Close - 1-3 m):' : 'Режим «Близко (1-3 м)»:'}
+                  </Body1Strong>
+                  <Body1 style={{ display: 'block' }}>
+                    {isEn
+                      ? 'Designed for front-row seating right in front of the lecturer. Uses gentle peak normalization to -3 dBFS with 100 Hz low-cut filter, eliminating compressor pumping and clipping distortion.'
+                      : 'Предназначен для студентов на первых партах прямо перед лектором. Применяет бережную пиковую нормализацию до -3 dBFS со срезом гула 100 Гц, полностью исключая перегруз и искажения компрессора.'}
+                  </Body1>
+                </div>
+                <Divider />
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                  <Body1Strong style={{ display: 'block' }}>
+                    {isEn ? '«Средне (3-7 м)» (Medium - 3-7 m):' : 'Режим «Средне (3-7 м)»:'}
+                  </Body1Strong>
+                  <Body1 style={{ display: 'block' }}>
+                    {isEn
+                      ? 'Standard lecture classroom profile with balanced adaptive dynamic compression (+15.5 dB max) targeting -20 dBFS speech loudness.'
+                      : 'Стандартный профиль для середины учебной аудитории со сбалансированной адаптивной компрессией (+15.5 дБ) к целевой громкости -20 dBFS.'}
+                  </Body1>
+                </div>
+                <Divider />
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                  <Body1Strong style={{ display: 'block' }}>
+                    {isEn ? '«Далеко (7+ м)» (Far - 7+ m):' : 'Режим «Далеко (7+ м)»:'}
+                  </Body1Strong>
+                  <Body1 style={{ display: 'block' }}>
+                    {isEn
+                      ? 'Amplified speech gain boost (+23 dB max) for large lecture halls and amphitheaters when recording from back rows.'
+                      : 'Усиленный подъем тихого голоса (+23 дБ) для больших лекционных залов и амфитеатров при записи с дальних рядов.'}
                   </Body1>
                 </div>
               </div>

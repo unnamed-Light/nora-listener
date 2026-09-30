@@ -2,7 +2,7 @@
 
 [English](ARCHITECTURE_EN.md) | [Русский](ARCHITECTURE.md)
 
-This document provides an in-depth engineering breakdown of the architectural decisions, algorithms, data processing pipelines, and technology stack powering Nora Listener (v1.2.1).
+This document provides an in-depth engineering breakdown of the architectural decisions, algorithms, data processing pipelines, and technology stack powering Nora Listener (v1.2.2).
 
 ---
 
@@ -40,6 +40,7 @@ When designing a desktop utility for university and academic environments, sever
 │  - lib.rs / main.rs: Security capabilities, IPC router, Async runtime  │
 │  - native_audio.rs: WASAPI audio capture via cpal                      │
 │  - whisper_candle.rs: Audio container probing via symphonia            │
+│  - dsp_chain.rs: DSP 2.1 (Anti-Phase, Anti-Aliasing, Distance Profiles)│
 │  - diarization.rs: Real-time Cooley-Tukey FFT & F0 pitch tracking      │
 │  - cloud_api.rs: In-memory WAV chunking, Groq LPU API, sanitization    │
 │  - Context-Aware Prompt Assembler (Multi-source academic prompt)       │
@@ -61,8 +62,9 @@ When designing a desktop utility for university and academic environments, sever
 To support diverse recording formats produced by university voice recorders, smartphones, and video cameras, Nora Listener implements a container-agnostic decoding pipeline powered by `symphonia`:
 - **Supported container formats**: WAV, MP3, AAC, M4A, MP4 (audio track), FLAC, OGG Vorbis, MKV, CAF.
 - **Stream probing**: The file is wrapped in a `MediaSourceStream`, and format parameters are determined via heuristic probing (`get_probe()`).
-- **Channel normalization**: Multi-channel packets (stereo, 5.1 surround) are folded down to a mono 32-bit floating-point buffer (`Vec<f32>`) by averaging across active channels:
-  $$\text{sample}_{\text{mono}} = \frac{1}{C} \sum_{c=1}^{C} \text{sample}_c$$
+- **Anti-Phase Laptop Microphone Protection**: Blindly summing stereo microphone arrays $(L + R)/2$ on laptops creates severe acoustic phase cancellation (comb filtering) in the critical $1.5\text{–}4\text{ kHz}$ speech formant band. In version 1.2.2, `extract_primary_mono_channel` extracts the discrete primary physical microphone capsule (Channel 0), restoring natural voice timbre and clarity:
+  $$\text{sample}_{\text{mono}} = \text{sample}_0$$
+- **Anti-Aliasing Resampling to 16 kHz**: A steep 4th-order cascaded Butterworth low-pass filter at $7200\text{ Hz}$ combined with 4-point cubic Hermite spline interpolation ($C^1$ continuity) prevents ultrasonic and harmonic aliasing.
 
 ### 2.2. Low-Latency Microphone Capture (`native_audio.rs`)
 Real-time audio streaming is implemented using the `cpal` crate interfacing with Windows **WASAPI**:
@@ -70,21 +72,21 @@ Real-time audio streaming is implemented using the `cpal` crate interfacing with
 - **Throttled spectral visualization**: Amplitude peak measurements dispatched to the UI visualizer are rate-limited to 40 ms intervals (~25 FPS) to eliminate IPC event queue saturation.
 - **Lossless WAV packaging**: Upon stopping recording, the buffer is serialized via `hound` into a standard 16-bit PCM WAV stored securely in `app_data_dir/recordings/`.
 
-### 2.3. Pre-Recognition Signal Conditioning and Normalization (DSP 2.0, `dsp_chain.rs`)
-In v1.2.0, Nora Listener introduces a specialized speech processing pipeline addressing distant speech (5–15 meters) and laptop microphone limitations:
-1. **Speech Bandpass Filter**:
-   - **2nd-Order Butterworth High-Pass Filter (100 Hz)**:
-     Eliminates DC offset, laptop cooling fan chassis vibrations, desk rumble, and 50/60 Hz power grid hum.
-   - **2nd-Order Butterworth Low-Pass Filter (7500 Hz)**:
-     Attenuates electrical coil whine, high-frequency hiss, and quantization noise, restricting the bandwidth to human voice formants.
-   - Biquad section transfer function:
-     $$H(z) = \frac{b_0 + b_1 z^{-1} + b_2 z^{-2}}{1 + a_1 z^{-1} + a_2 z^{-2}}$$
-2. **Multi-Stage AGC & Limiter**:
-   - Continuous RMS envelope tracking with rapid attack ($40\text{ ms}$) to catch spoken syllables and smooth release ($400\text{ ms}$) to prevent noise pumping between words.
-   - **Adaptive Makeup Gain**: Distant, faint speech is amplified by up to $+18\text{ dB}$ (standard), $+23.5\text{ dB}$ (high, recommended for lecture halls), or $+28\text{ dB}$ (ultra) toward target $0.15\text{ RMS}$.
-   - **Soft-Knee Compressor and Brickwall Limiter**: Transient spikes near the microphone (coughs, door slams, keyboard clicks) are smoothed above $0.85\text{ FS}$ and brickwalled at $0.98\text{ FS}$, preventing clipping and distortion.
-3. **Dynamic Voice Activity Detection (VAD)**:
-   - Replaces the former static cutoff ($0.012$) with dynamic room noise floor tracking sensitive down to $0.0025\text{ RMS}$, preventing the accidental dropping of faint lecture phrases.
+### 2.3. Pre-Recognition Signal Conditioning and Distance Profiles (DSP 2.1, `dsp_chain.rs`)
+In v1.2.2, the signal pipeline is upgraded to **DSP 2.1**, completely resolving speech distortion when sitting directly in front of the lecturer:
+1. **Single-Pass Normalization (Elimination of Double Processing)**:
+   Previous versions applied AGC amplification at recording completion and then re-compressed the signal a second time during cloud/local Whisper decoding. DSP 2.1 ensures audio is normalized exactly once upon saving, delivering an unclipped, pristine audio stream to Whisper.
+2. **Distance to Lecturer Profiles (Distance Profiles)**:
+   - **«Close (1-3 m)»**: Engineered for front-row students. The speaker's voice is already loud; aggressive makeup gain is disabled. The pipeline performs gentle peak normalization to $-3\text{ dBFS}$ ($0.707\text{ max}$) with maximum gain capped at $2.2\times$ and 100 Hz rumble cut. Zero saturation, zero pumping, zero distortion.
+   - **«Medium (3-7 m)»**: Standard classroom profile with balanced adaptive compression up to $+15.5\text{ dB}$ targeting $-20\text{ dBFS}$ ($0.10\text{ RMS}$).
+   - **«Far (7+ m)»**: High speech boost up to $+23\text{ dB}$ for distant lecturers in amphitheaters and auditoriums.
+3. **Bandpass Filtering**:
+   - 2nd-Order Butterworth High-Pass Filter ($100\text{ Hz}$): cuts laptop fan hum, HVAC vibrations, and desk thumps.
+   - 2nd-Order Butterworth Low-Pass Filter ($7500\text{ Hz}$): attenuates electrical coil whine and high-frequency noise.
+4. **4th-Order Butterworth Anti-Aliasing Filter (7200 Hz)**:
+   Cascaded 2-stage biquad low-pass filter providing steep $-24\text{ dB/octave}$ rolloff above $7200\text{ Hz}$, guaranteeing zero mirror folding across the $8\text{ kHz}$ Nyquist boundary during downsampling to $16\text{ kHz}$.
+5. **Dynamic Voice Activity Detection (VAD)**:
+   Adaptive room noise floor tracking sensitive down to $0.0025\text{ RMS}$ prevents dropping soft sentence beginnings and endings.
 
 ---
 
@@ -128,9 +130,9 @@ To achieve recognition speeds exceeding 200x real-time, Nora Listener leverages 
 - **In-memory chunk serialization**:
   Audio streams are divided into 10-minute chunks and encoded into WAV directly in RAM via `std::io::Cursor<Vec<u8>>` and `hound::WavWriter`, completely eliminating temporary disk I/O bottlenecks.
 - **Contextual vocabulary biasing**:
-  Requests are seeded with an academic prompt:
-  > *"University lecture. Professor explaining course concepts to students. Higher mathematics, discrete mathematics, algorithms, programming, formulas, terminology..."*
-  This primes Whisper's autoregressive decoder for proper punctuation, capitalization, and accurate scientific term recognition.
+  Requests are seeded with a neutral academic lecture prompt:
+  > *"Academic university lecture. Professor explaining course concepts to students. Scientific terminology, definitions, rules, formulas, examples, clear speech and punctuation: "*
+  This primes Whisper's autoregressive decoder for proper punctuation, capitalization, and accurate scientific term recognition across all academic subjects.
 
 ### 4.2. Heuristic Hallucination Suppression (`is_hallucination`)
 During prolonged audio silence or background noise, Whisper models may emit repetitive artifacts inherited from YouTube training corpora. The `is_hallucination` function sanitizes incoming text against known artifact dictionaries before content enters the state tree.

@@ -19,8 +19,10 @@ fn start_native_recording(
     realtime_config: Option<native_audio::RealtimeConfig>,
     enhance_audio: Option<bool>,
     agc_boost: Option<String>,
+    distance_mode: Option<String>,
 ) -> Result<(), String> {
-    native_audio::start_recording(app, device_id, realtime_config, enhance_audio, agc_boost)
+    let mode = distance_mode.or(agc_boost);
+    native_audio::start_recording(app, device_id, realtime_config, enhance_audio, mode)
 }
 
 #[tauri::command]
@@ -35,8 +37,10 @@ async fn start_transcription(
     model: String,
     api_key: Option<String>,
     enable_diarization: Option<bool>,
+    distance_mode: Option<String>,
 ) -> Result<(), String> {
     let diarize = enable_diarization.unwrap_or(false);
+    let dist_mode = distance_mode.clone();
     // Run the heavy CPU bound task in a blocking thread
     let result = tauri::async_runtime::spawn_blocking(move || {
         if model == "cloud" || model == "accuracy" || model == "speed" || model.starts_with("cloud-") {
@@ -44,7 +48,7 @@ async fn start_transcription(
             if key.is_empty() {
                 return Err(anyhow::anyhow!("Для облачной расшифровки требуется API ключ Groq"));
             }
-            cloud_api::transcribe_cloud(&path, &key, &app, diarize, &model)
+            cloud_api::transcribe_cloud(&path, &key, &app, diarize, &model, dist_mode.as_deref())
         } else {
             whisper_candle::transcribe_audio(&path, &model, &app, diarize)
         }

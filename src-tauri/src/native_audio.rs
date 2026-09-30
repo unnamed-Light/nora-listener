@@ -192,7 +192,7 @@ fn realtime_worker_loop(
     let mut full_transcript = String::new();
     let mut chunk_index = 0usize;
 
-    let base_academic_prompt = "Академическая лекция в университете. Преподаватель объясняет материал студентам. Высшая математика, формулы, термины, определения, правила, примеры: ";
+    let base_academic_prompt = "Академическая университетская лекция. Преподаватель объясняет материал студентам. Научная терминология, определения, правила, формулы, примеры, четкая русская речь и пунктуация: ";
 
     let dispatch_chunk = |samples: &[f32],
                           overlap: &[f32],
@@ -208,34 +208,14 @@ fn realtime_worker_loop(
         combined.extend_from_slice(overlap);
         combined.extend_from_slice(samples);
 
-        // Mix to mono if needed
-        let mono_samples: Vec<f32> = if ch > 1 {
-            combined.chunks_exact(ch).map(|chunk| chunk.iter().sum::<f32>() / ch as f32).collect()
-        } else {
-            combined
-        };
-
+        // Mix to mono with anti-phase protection (extract primary mic capsule)
+        let mono_samples = crate::dsp_chain::extract_primary_mono_channel(&combined, ch);
         if mono_samples.is_empty() {
             return None;
         }
 
-        // Resample down to 16,000 Hz
-        let resampled: Vec<f32> = if device_sample_rate != target_rate {
-            let ratio = device_sample_rate as f64 / target_rate as f64;
-            let target_len = (mono_samples.len() as f64 / ratio) as usize;
-            let mut out = Vec::with_capacity(target_len);
-            for i in 0..target_len {
-                let src_idx = i as f64 * ratio;
-                let idx_floor = (src_idx.floor() as usize).min(mono_samples.len() - 1);
-                let idx_ceil = (idx_floor + 1).min(mono_samples.len() - 1);
-                let frac = (src_idx - idx_floor as f64) as f32;
-                let val = mono_samples[idx_floor] * (1.0 - frac) + mono_samples[idx_ceil] * frac;
-                out.push(val);
-            }
-            out
-        } else {
-            mono_samples
-        };
+        // Resample to 16,000 Hz with steep anti-aliasing filter and cubic Hermite interpolation
+        let resampled = crate::dsp_chain::resample_to_16k(&mono_samples, device_sample_rate);
 
         // DSP 2.0 Speech Enhancement & Normalization
         let mut normalized = resampled;
@@ -644,35 +624,12 @@ pub fn stop_recording(app: AppHandle) -> Result<String, String> {
         return Err("Записано 0 сэмплов".to_string());
     }
 
-    // Mix multi-channel to mono
-    let mono_samples: Vec<f32> = if session.channels > 1 {
-        let ch = session.channels as usize;
-        raw_samples
-            .chunks_exact(ch)
-            .map(|chunk| chunk.iter().sum::<f32>() / ch as f32)
-            .collect()
-    } else {
-        raw_samples
-    };
+    // Extract primary mono channel (avoids phase cancellation on dual-mic laptop arrays)
+    let mono_samples = crate::dsp_chain::extract_primary_mono_channel(&raw_samples, session.channels as usize);
 
-    // Resample down to 16,000 Hz if needed (Whisper native sample rate)
+    // Resample down to 16,000 Hz with steep anti-aliasing filter and cubic Hermite interpolation
     let target_rate: u32 = 16000;
-    let resampled: Vec<f32> = if session.sample_rate != target_rate {
-        let ratio = session.sample_rate as f64 / target_rate as f64;
-        let target_len = (mono_samples.len() as f64 / ratio) as usize;
-        let mut out = Vec::with_capacity(target_len);
-        for i in 0..target_len {
-            let src_idx = i as f64 * ratio;
-            let idx_floor = (src_idx.floor() as usize).min(mono_samples.len() - 1);
-            let idx_ceil = (idx_floor + 1).min(mono_samples.len() - 1);
-            let frac = (src_idx - idx_floor as f64) as f32;
-            let val = mono_samples[idx_floor] * (1.0 - frac) + mono_samples[idx_ceil] * frac;
-            out.push(val);
-        }
-        out
-    } else {
-        mono_samples
-    };
+    let resampled = crate::dsp_chain::resample_to_16k(&mono_samples, session.sample_rate);
 
     // Check maximum peak
     let mut max_peak: f32 = 0.0;

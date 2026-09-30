@@ -496,6 +496,12 @@ const translations = {
     expandAudioPanel: 'Развернуть панель аудио',
     aiLockedTooltip: 'Режим «ИИ: Онлайн» зафиксирован: распознавание и конспектирование используют облачный процессор Groq LPU',
     aiLockedBadge: 'Зафиксировано',
+    distClose: 'Близко (1-3 м)',
+    distCloseTooltip: 'Первые парты перед преподавателем. Бережная нормализация до -3 dBFS без компрессии и искажений',
+    distMedium: 'Средне (3-7 м)',
+    distMediumTooltip: 'Середина аудитории (3-7 метров). Оптимальная адаптивная компрессия речи',
+    distFar: 'Далеко (7+ м)',
+    distFarTooltip: 'Дальние ряды (7+ метров) или большой зал. Усиленный речевой гейн (+23 дБ)',
   },
   en: {
     title: 'Nora Listener', history: 'Lecture History', dropHere: 'Drop audio/video file here',
@@ -546,6 +552,12 @@ const translations = {
     expandAudioPanel: 'Expand audio panel',
     aiLockedTooltip: 'AI: Online mode is fixed: recognition and notes use cloud Groq LPU acceleration',
     aiLockedBadge: 'Locked',
+    distClose: 'Close (1-3 m)',
+    distCloseTooltip: 'Front rows near lecturer. Gentle normalization to -3 dBFS without compression distortion',
+    distMedium: 'Medium (3-7 m)',
+    distMediumTooltip: 'Middle of lecture hall (3-7 meters). Balanced adaptive speech compression',
+    distFar: 'Far (7+ m)',
+    distFarTooltip: 'Back rows (7+ meters) or large auditorium. High speech gain boost (+23 dB)',
   }
 };
 
@@ -556,9 +568,9 @@ function App() {
     theme, language, apiKey, lastSaveDirectory, selectedMicrophoneId, enableDiarization, recognitionMode,
     sidebarWidth, splitViewRatio,
     realtimeTranscriptionEnabled, realtimeModel, realtimeChunkWindow, realtimeVadSensitivity,
-    audioEnhanceEnabled, audioAgcBoost,
+    audioEnhanceEnabled, audioAgcBoost, distanceMode,
     toggleTheme, setLastSaveDirectory, setSelectedMicrophoneId, setEnableDiarization, setRecognitionMode,
-    setSidebarWidth, setSplitViewRatio
+    setSidebarWidth, setSplitViewRatio, setDistanceMode
   } = useAppStore();
   
   const t = translations[language];
@@ -588,7 +600,7 @@ function App() {
     if (!autoCheckUpdates) return;
     const timer = setTimeout(async () => {
       try {
-        const info = await checkForUpdates('1.2.1');
+        const info = await checkForUpdates('1.2.2');
         setLastUpdateCheckTime(Date.now());
         if (info.hasUpdate && info.latestVersion !== ignoredUpdateVersion) {
           setPendingUpdateInfo(info);
@@ -736,6 +748,7 @@ function App() {
         realtimeConfig,
         enhanceAudio: audioEnhanceEnabled ?? true,
         agcBoost: audioAgcBoost || 'high',
+        distanceMode: distanceMode || 'close',
       });
 
       setIsRecording(true);
@@ -998,7 +1011,7 @@ function App() {
     });
 
     try {
-      await invoke('start_transcription', { path: selectedFilePath, model: recognitionMode, apiKey, enableDiarization });
+      await invoke('start_transcription', { path: selectedFilePath, model: recognitionMode, apiKey, enableDiarization, distanceMode: distanceMode || 'close' });
       const sessionId = Date.now().toString();
       setCurrentSessionId(sessionId);
       addTranscription({
@@ -1540,6 +1553,43 @@ function App() {
                 title={t.speedModeTooltip}
               >
                 {t.speedMode}
+              </Button>
+            </div>
+            <div 
+              style={{ 
+                display: 'inline-flex', 
+                alignItems: 'center', 
+                backgroundColor: tokens.colorNeutralBackground3, 
+                borderRadius: tokens.borderRadiusMedium, 
+                padding: '2px', 
+                gap: '2px',
+                border: `1px solid ${tokens.colorNeutralStroke2}`,
+                flexShrink: 0
+              }}
+            >
+              <Button 
+                size="small" 
+                appearance={distanceMode === 'close' ? 'primary' : 'subtle'}
+                onClick={() => setDistanceMode('close')}
+                title={t.distCloseTooltip}
+              >
+                {t.distClose}
+              </Button>
+              <Button 
+                size="small" 
+                appearance={distanceMode === 'medium' ? 'primary' : 'subtle'}
+                onClick={() => setDistanceMode('medium')}
+                title={t.distMediumTooltip}
+              >
+                {t.distMedium}
+              </Button>
+              <Button 
+                size="small" 
+                appearance={distanceMode === 'far' ? 'primary' : 'subtle'}
+                onClick={() => setDistanceMode('far')}
+                title={t.distFarTooltip}
+              >
+                {t.distFar}
               </Button>
             </div>
             {isTranscribing && <div className={styles.progressContainer}><ProgressBar value={progress} /></div>}

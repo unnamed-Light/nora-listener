@@ -185,7 +185,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, l
     setUpdateStatusText(null);
     setLatestFoundInfo(null);
     try {
-      const info = await checkForUpdates('1.2.1');
+      const info = await checkForUpdates('1.2.2');
       if (info.hasUpdate) {
         setLatestFoundInfo(info);
         if (onOpenUpdateModal) {
@@ -509,7 +509,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, l
                   <div className={styles.sectionTitleRow}>
                     <div className={styles.sectionHeader}>
                       <Speaker220Regular style={{ color: tokens.colorBrandForeground1 }} />
-                      <Body1Strong>{isRu ? 'Улучшение звука и микрофона (DSP 2.0 & AGC)' : 'Audio Enhancement & AGC (DSP 2.0)'}</Body1Strong>
+                      <Body1Strong>{isRu ? 'Улучшение звука и микрофона (DSP 2.1 & AGC)' : 'Audio Enhancement & AGC (DSP 2.1)'}</Body1Strong>
                     </div>
                     {audioEnhanceEnabled ? (
                       <Badge appearance="filled" color="brand" size="small">
@@ -588,7 +588,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, l
                         <Body1Strong>{isRu ? 'О программе' : 'About Application'}</Body1Strong>
                       </div>
                       <Body1 style={{ fontSize: '13px', color: tokens.colorNeutralForeground2 }}>
-                        Nora Listener — v1.2.1
+                        Nora Listener — v1.2.2
                       </Body1>
                     </div>
                   </div>
