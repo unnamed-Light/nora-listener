@@ -38,6 +38,10 @@ interface AppState {
   audioEnhanceEnabled: boolean;
   audioAgcBoost: AudioAgcBoost;
   distanceMode: DistanceMode;
+  lectureSubject: string;
+  lectureLecturer: string;
+  lectureGlossary: string;
+  enableAsrCorrection: boolean;
   toggleTheme: () => void;
   setAiMode: (mode: AiMode) => void;
   setLanguage: (lang: Language) => void;
@@ -62,6 +66,10 @@ interface AppState {
   setAudioEnhanceEnabled: (enabled: boolean) => void;
   setAudioAgcBoost: (boost: AudioAgcBoost) => void;
   setDistanceMode: (mode: DistanceMode) => void;
+  setLectureSubject: (subject: string) => void;
+  setLectureLecturer: (lecturer: string) => void;
+  setLectureGlossary: (glossary: string) => void;
+  setEnableAsrCorrection: (enabled: boolean) => void;
 }
 
 export const useAppStore = create<AppState>()(
@@ -90,6 +98,10 @@ export const useAppStore = create<AppState>()(
       audioEnhanceEnabled: true,
       audioAgcBoost: 'high',
       distanceMode: 'close',
+      lectureSubject: '',
+      lectureLecturer: '',
+      lectureGlossary: '',
+      enableAsrCorrection: true,
       toggleTheme: () => set((state) => ({ theme: state.theme === 'light' ? 'dark' : 'light' })),
       setAiMode: (mode) => set({ aiMode: mode }),
       setLanguage: (lang) => set({ language: lang }),
@@ -114,6 +126,10 @@ export const useAppStore = create<AppState>()(
       setAudioEnhanceEnabled: (enabled) => set({ audioEnhanceEnabled: enabled }),
       setAudioAgcBoost: (boost) => set({ audioAgcBoost: boost }),
       setDistanceMode: (mode) => set({ distanceMode: mode }),
+      setLectureSubject: (subject) => set({ lectureSubject: subject }),
+      setLectureLecturer: (lecturer) => set({ lectureLecturer: lecturer }),
+      setLectureGlossary: (glossary) => set({ lectureGlossary: glossary }),
+      setEnableAsrCorrection: (enabled) => set({ enableAsrCorrection: enabled }),
     }),
     {
       name: 'app-store',

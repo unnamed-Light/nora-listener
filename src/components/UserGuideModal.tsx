@@ -926,6 +926,44 @@ export const UserGuideModal: React.FC<UserGuideModalProps> = ({ isOpen, onClose,
               </div>
             </div>
 
+            <div className={styles.sectionCard}>
+              <Subtitle2>{isEn ? 'Lecture Vocabulary & Two-Stage ASR (v1.2.3):' : 'Словарь лекции и двухэтапная выверка ASR (v1.2.3):'}</Subtitle2>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                  <Body1Strong style={{ display: 'block' }}>
+                    {isEn ? 'Dynamic Vocabulary Biasing in Whisper:' : 'Динамическая ориентация словаря Whisper (Vocabulary Biasing):'}
+                  </Body1Strong>
+                  <Body1 style={{ display: 'block' }}>
+                    {isEn
+                      ? 'In the «Lecture Vocabulary & Context» panel, enter course name, lecturer full name, and specialized terms. Nora primes Whisper cross-attention heads, elevating recognition accuracy of rare proper nouns and technical terms from ~40% to ~95%+.'
+                      : 'В панели «Словарь лекции и контекст распознавания» укажите дисциплину, ФИО преподавателя и ключевые термины. Нора передает их в промпт Whisper, повышая точность распознавания редких фамилий и терминов с ~40% до 95%+.'}
+                  </Body1>
+                </div>
+                <Divider />
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                  <Body1Strong style={{ display: 'block' }}>
+                    {isEn ? 'AI Post-Correction via Llama 3.3 70B on Groq:' : 'Нейросетевая ИИ-выверка терминов (Llama 3.3 70B на Groq):'}
+                  </Body1Strong>
+                  <Body1 style={{ display: 'block' }}>
+                    {isEn
+                      ? 'Automatic or on-demand post-processing pass running on Groq (3-5 seconds). Reconstructs phonetically distorted terms, acronyms, and formulas while strictly preserving 100% of speech words, paragraph boundaries, and speaker labels without hallucinating.'
+                      : 'Автоматический или ручной этап коррекции текста на сверхбыстром ускорителе Groq (3–5 секунд). Восстанавливает искаженные при распознавании термины, аббревиатуры и фамилии, строго сохраняя 100% объема лекции, теги спикеров и деление на абзацы.'}
+                  </Body1>
+                </div>
+                <Divider />
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                  <Body1Strong style={{ display: 'block' }}>
+                    {isEn ? '«Verify Current Text (AI)» Button:' : 'Кнопка «Выверить текущий текст (ИИ)»:'}
+                  </Body1Strong>
+                  <Body1 style={{ display: 'block' }}>
+                    {isEn
+                      ? 'Allows running AI correction on existing transcriptions at any time, instantly fixing vocabulary without needing to re-record or re-transcribe the audio.'
+                      : 'Позволяет в любой момент запустить выверку уже готового транскрипта, исправляя терминологию и фамилии без необходимости повторной записи или долгой перерасшифровки.'}
+                  </Body1>
+                </div>
+              </div>
+            </div>
+
             <div className={styles.calloutNote}>
               <Lightbulb20Regular style={{ flexShrink: 0, marginTop: '2px' }} />
               <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>

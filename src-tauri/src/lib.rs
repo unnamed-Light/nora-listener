@@ -38,6 +38,7 @@ async fn start_transcription(
     api_key: Option<String>,
     enable_diarization: Option<bool>,
     distance_mode: Option<String>,
+    context: Option<cloud_api::TranscriptionContext>,
 ) -> Result<(), String> {
     let diarize = enable_diarization.unwrap_or(false);
     let dist_mode = distance_mode.clone();
@@ -48,7 +49,7 @@ async fn start_transcription(
             if key.is_empty() {
                 return Err(anyhow::anyhow!("Для облачной расшифровки требуется API ключ Groq"));
             }
-            cloud_api::transcribe_cloud(&path, &key, &app, diarize, &model, dist_mode.as_deref())
+            cloud_api::transcribe_cloud(&path, &key, &app, diarize, &model, dist_mode.as_deref(), context.as_ref())
         } else {
             whisper_candle::transcribe_audio(&path, &model, &app, diarize)
         }
@@ -58,6 +59,23 @@ async fn start_transcription(
         Ok(_) => Ok(()),
         Err(e) => Err(e.to_string()),
     }
+}
+
+#[tauri::command]
+async fn correct_transcript(
+    app: tauri::AppHandle,
+    text: String,
+    api_key: String,
+    context: Option<cloud_api::TranscriptionContext>,
+) -> Result<String, String> {
+    if api_key.trim().is_empty() {
+        return Err("Для выверки текста укажите Groq API ключ (gsk_...) в Настройках".to_string());
+    }
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        cloud_api::correct_transcript_asr(&text, &api_key, context.as_ref(), Some(&app))
+    }).await.map_err(|e| e.to_string())?;
+
+    result.map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -122,6 +140,7 @@ pub fn run() {
     .plugin(tauri_plugin_dialog::init())
     .invoke_handler(tauri::generate_handler![
       start_transcription,
+      correct_transcript,
       generate_summary,
       write_text_file,
       write_binary_file,

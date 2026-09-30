@@ -37,6 +37,7 @@ import { checkForUpdates } from './lib/updateChecker';
 import type { UpdateInfo } from './lib/updateChecker';
 import { ContextPanel } from './components/ContextPanel';
 import { ClarifyingPromptPanel } from './components/ClarifyingPromptPanel';
+import { LectureVocabularyPanel } from './components/LectureVocabularyPanel';
 import { formatContextForPrompt } from './lib/contextExtractor';
 import type { ContextItem } from './lib/contextExtractor';
 
@@ -569,6 +570,7 @@ function App() {
     sidebarWidth, splitViewRatio,
     realtimeTranscriptionEnabled, realtimeModel, realtimeChunkWindow, realtimeVadSensitivity,
     audioEnhanceEnabled, audioAgcBoost, distanceMode,
+    lectureSubject, lectureLecturer, lectureGlossary, enableAsrCorrection,
     toggleTheme, setLastSaveDirectory, setSelectedMicrophoneId, setEnableDiarization, setRecognitionMode,
     setSidebarWidth, setSplitViewRatio, setDistanceMode
   } = useAppStore();
@@ -577,6 +579,7 @@ function App() {
 
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [isTranscribing, setIsTranscribing] = useState(false);
+  const [isCorrecting, setIsCorrecting] = useState(false);
   const [transcription, setTranscription] = useState('');
   const [summary, setSummary] = useState('');
   const [activeTab, setActiveTab] = useState<'transcript' | 'summary' | 'split'>('transcript');
@@ -600,7 +603,7 @@ function App() {
     if (!autoCheckUpdates) return;
     const timer = setTimeout(async () => {
       try {
-        const info = await checkForUpdates('1.2.2');
+        const info = await checkForUpdates('1.2.3');
         setLastUpdateCheckTime(Date.now());
         if (info.hasUpdate && info.latestVersion !== ignoredUpdateVersion) {
           setPendingUpdateInfo(info);
@@ -1010,8 +1013,26 @@ function App() {
       fullText = event.payload;
     });
 
+    const unlistenCorrected = await listen<string>('transcription-corrected', (event) => {
+      setTranscription(event.payload);
+      fullText = event.payload;
+    });
+
     try {
-      await invoke('start_transcription', { path: selectedFilePath, model: recognitionMode, apiKey, enableDiarization, distanceMode: distanceMode || 'close' });
+      const transcriptionContext = {
+        subject: lectureSubject.trim() || undefined,
+        lecturer: lectureLecturer.trim() || undefined,
+        glossary: lectureGlossary.trim() || undefined,
+        enable_asr_correction: enableAsrCorrection,
+      };
+      await invoke('start_transcription', {
+        path: selectedFilePath,
+        model: recognitionMode,
+        apiKey,
+        enableDiarization,
+        distanceMode: distanceMode || 'close',
+        context: transcriptionContext,
+      });
       const sessionId = Date.now().toString();
       setCurrentSessionId(sessionId);
       addTranscription({
@@ -1035,6 +1056,57 @@ function App() {
       unlistenText();
       unlistenProgress();
       unlistenDiarized();
+      unlistenCorrected();
+    }
+  };
+
+  const handleManualAsrCorrection = async () => {
+    const textToCorrect = transcription.trim();
+    if (!textToCorrect) {
+      alert(language === 'ru'
+        ? 'Сначала расшифруйте лекцию или вставьте текст в поле транскрипта.'
+        : 'Please transcribe audio or enter text in the transcript field first.');
+      return;
+    }
+    if (!apiKey) {
+      setIsSettingsOpen(true);
+      alert(language === 'ru'
+        ? 'Укажите ключ Groq API (gsk_...) в Настройках приложения.'
+        : 'Please enter your Groq API key (gsk_...) in Application Settings.');
+      return;
+    }
+
+    setIsCorrecting(true);
+    const startTime = new Date().toLocaleTimeString();
+    console.log(`[${startTime}] [ИИ-выверка] Запуск выверки текста через Groq (Llama 3.3 70B)...`);
+
+    try {
+      const transcriptionContext = {
+        subject: lectureSubject.trim() || undefined,
+        lecturer: lectureLecturer.trim() || undefined,
+        glossary: lectureGlossary.trim() || undefined,
+        enable_asr_correction: enableAsrCorrection,
+      };
+      const corrected = await invoke<string>('correct_transcript', {
+        text: textToCorrect,
+        apiKey,
+        context: transcriptionContext,
+      });
+
+      if (corrected && corrected.trim().length > 0) {
+        setTranscription(corrected);
+        if (currentSessionId) {
+          updateTranscription(currentSessionId, { text: corrected });
+        }
+        const finishTime = new Date().toLocaleTimeString();
+        console.log(`[${finishTime}] [ИИ-выверка] Выверка успешно завершена!`);
+      }
+    } catch (e: any) {
+      const errTime = new Date().toLocaleTimeString();
+      console.error(`[${errTime}] [Ошибка ИИ-выверки] ${e?.message || String(e)}`);
+      alert(e?.message || String(e));
+    } finally {
+      setIsCorrecting(false);
     }
   };
 
@@ -1594,6 +1666,14 @@ function App() {
             </div>
             {isTranscribing && <div className={styles.progressContainer}><ProgressBar value={progress} /></div>}
           </div>
+
+          <LectureVocabularyPanel
+            language={language}
+            isTranscribing={isTranscribing}
+            hasTranscript={Boolean(transcription.trim())}
+            onManualCorrection={handleManualAsrCorrection}
+            isCorrecting={isCorrecting}
+          />
 
           <ContextPanel 
             contextItems={contextItems}

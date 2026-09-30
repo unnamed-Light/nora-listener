@@ -3,6 +3,14 @@ use reqwest::blocking::Client;
 use hound::{WavWriter, WavSpec, SampleFormat};
 use anyhow::Context;
 
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
+pub struct TranscriptionContext {
+    pub subject: Option<String>,
+    pub lecturer: Option<String>,
+    pub glossary: Option<String>,
+    pub enable_asr_correction: Option<bool>,
+}
+
 pub fn is_hallucination(text: &str) -> bool {
     let lower = text.trim().to_lowercase();
     let stripped: String = lower.chars().filter(|c| c.is_alphanumeric() || c.is_whitespace()).collect();
@@ -48,6 +56,7 @@ pub fn transcribe_cloud(
     enable_diarization: bool,
     mode: &str,
     distance_mode: Option<&str>,
+    context: Option<&TranscriptionContext>,
 ) -> anyhow::Result<String> {
     let whisper_model = if mode == "speed" || mode == "cloud-speed" || mode == "turbo" {
         "whisper-large-v3-turbo"
@@ -105,7 +114,41 @@ pub fn transcribe_cloud(
     app.emit("transcription-log", format!("Аудио разбито на {} частей по 10 мин. Скорость Groq Whisper: ~x200", total_chunks)).ok();
 
     let mut last_speaker: Option<usize> = None;
-    let base_academic_prompt = "Академическая университетская лекция. Преподаватель объясняет материал студентам. Научная терминология, определения, правила, формулы, примеры, четкая русская речь и пунктуация: ";
+    let mut biasing_elements = Vec::new();
+    if let Some(ctx) = context {
+        if let Some(ref subj) = ctx.subject {
+            let s = subj.trim();
+            if !s.is_empty() {
+                biasing_elements.push(format!("Предмет: {}.", s));
+            }
+        }
+        if let Some(ref lect) = ctx.lecturer {
+            let l = lect.trim();
+            if !l.is_empty() {
+                biasing_elements.push(format!("Преподаватель: {}.", l));
+            }
+        }
+        if let Some(ref gloss) = ctx.glossary {
+            let g = gloss.trim();
+            if !g.is_empty() {
+                biasing_elements.push(format!("Термины и имена: {}.", g));
+            }
+        }
+    }
+
+    let base_academic_prompt = if biasing_elements.is_empty() {
+        "Академическая университетская лекция. Преподаватель объясняет материал студентам. Научная терминология, определения, правила, формулы, примеры, четкая русская речь и пунктуация: ".to_string()
+    } else {
+        let joined_bias = biasing_elements.join(" ");
+        app.emit("transcription-log", format!("[Whisper Biasing] Применен контекстный словарь: {}", joined_bias)).ok();
+        let bias_chars: Vec<char> = joined_bias.chars().collect();
+        let safe_bias: String = if bias_chars.len() > 240 {
+            bias_chars[..240].iter().collect()
+        } else {
+            joined_bias
+        };
+        format!("Университетская лекция. {} Научная терминология, формулы, четкая русская речь: ", safe_bias)
+    };
     let mut previous_tail = String::new();
 
     for (i, chunk) in chunks.into_iter().enumerate() {
@@ -251,16 +294,34 @@ pub fn transcribe_cloud(
         app.emit("transcription-progress", progress as i32).ok();
     }
 
-    if full_transcription.trim().is_empty() {
+    let mut final_transcription = full_transcription;
+
+    if final_transcription.trim().is_empty() {
         app.emit("transcription-log", "[Внимание] Человеческая речь не распознана. Проверьте, выбран ли правильный микрофон.").ok();
     } else {
         if enable_diarization {
-            app.emit("transcription-diarized", full_transcription.clone()).ok();
+            app.emit("transcription-diarized", final_transcription.clone()).ok();
             app.emit("transcription-log", "[Диаризация] Акустическая разметка спикеров успешно применена!").ok();
         }
+
+        let should_auto_correct = context.and_then(|c| c.enable_asr_correction).unwrap_or(true);
+        if should_auto_correct {
+            match correct_transcript_asr(&final_transcription, api_key, context, Some(app)) {
+                Ok(corrected) => {
+                    if !corrected.trim().is_empty() && corrected.chars().count() >= (final_transcription.chars().count() * 6 / 10) {
+                        final_transcription = corrected;
+                        app.emit("transcription-corrected", final_transcription.clone()).ok();
+                    }
+                }
+                Err(e) => {
+                    app.emit("transcription-log", format!("[ИИ-выверка] Предупреждение при автовыверке: {}", e)).ok();
+                }
+            }
+        }
+
         app.emit("transcription-log", "[Успешно] Облачная расшифровка завершена!").ok();
     }
-    Ok(full_transcription)
+    Ok(final_transcription)
 }
 
 fn diarize_chunk(
@@ -375,6 +436,182 @@ pub fn diarize_transcript(
 
     app.emit("transcription-log", "[Диаризация] Разметка спикеров успешно завершена!").ok();
     Ok(result)
+}
+
+fn correct_single_chunk(
+    client: &Client,
+    api_key: &str,
+    models: &[&str],
+    system_prompt: &str,
+    chunk_text: &str,
+) -> anyhow::Result<String> {
+    let mut last_error = String::new();
+
+    for model in models {
+        let mut payload_map = serde_json::Map::new();
+        payload_map.insert("model".to_string(), serde_json::Value::String(model.to_string()));
+        payload_map.insert("messages".to_string(), serde_json::json!([
+            { "role": "system", "content": system_prompt },
+            { "role": "user", "content": format!("Вот фрагмент расшифровки лекции для выверки терминов:\n\n{}", chunk_text) }
+        ]));
+        payload_map.insert("temperature".to_string(), serde_json::json!(0.0));
+        payload_map.insert("max_tokens".to_string(), serde_json::json!(8192));
+
+        if model.starts_with("openai/gpt-oss") {
+            payload_map.insert("reasoning_format".to_string(), serde_json::json!("hidden"));
+        }
+
+        let payload = serde_json::Value::Object(payload_map);
+
+        let res = client.post("https://api.groq.com/openai/v1/chat/completions")
+            .bearer_auth(api_key)
+            .json(&payload)
+            .send();
+
+        match res {
+            Ok(resp) => {
+                if resp.status().is_success() {
+                    if let Ok(json) = resp.json::<serde_json::Value>() {
+                        if let Some(content) = json["choices"][0]["message"]["content"].as_str() {
+                            let clean = sanitize_summary(content);
+                            // Safety sanity check: output must retain most of original text length
+                            if clean.chars().count() >= (chunk_text.chars().count() * 6 / 10) {
+                                return Ok(clean);
+                            } else {
+                                last_error = format!("Модель {} выдала слишком короткий ответ (возможная суммаризация)", model);
+                                continue;
+                            }
+                        }
+                    }
+                } else {
+                    let status = resp.status();
+                    let err_txt = resp.text().unwrap_or_default();
+                    last_error = format!("{} (HTTP {}): {}", model, status, err_txt);
+                    if status.as_u16() == 429 {
+                        std::thread::sleep(std::time::Duration::from_millis(2000));
+                    }
+                    continue;
+                }
+            }
+            Err(e) => {
+                last_error = format!("{}: {}", model, e);
+                continue;
+            }
+        }
+    }
+
+    if !last_error.is_empty() {
+        eprintln!("[correct_single_chunk fallback] Error: {}", last_error);
+    }
+    Ok(chunk_text.to_string())
+}
+
+pub fn correct_transcript_asr(
+    text: &str,
+    api_key: &str,
+    context: Option<&TranscriptionContext>,
+    app: Option<&tauri::AppHandle>,
+) -> anyhow::Result<String> {
+    let trimmed = text.trim();
+    if trimmed.is_empty() {
+        return Ok(String::new());
+    }
+
+    if let Some(app_handle) = app {
+        app_handle.emit("transcription-log", "[ИИ-выверка] Анализ транскрипта и восстановление терминов (Groq Llama 3.3 70B)...").ok();
+    }
+
+    let client = Client::new();
+
+    let mut context_desc = String::new();
+    if let Some(ctx) = context {
+        if let Some(ref subj) = ctx.subject {
+            if !subj.trim().is_empty() {
+                context_desc.push_str(&format!("\n- Предмет / Дисциплина: {}", subj.trim()));
+            }
+        }
+        if let Some(ref lect) = ctx.lecturer {
+            if !lect.trim().is_empty() {
+                context_desc.push_str(&format!("\n- Преподаватель (ФИО): {}", lect.trim()));
+            }
+        }
+        if let Some(ref gloss) = ctx.glossary {
+            if !gloss.trim().is_empty() {
+                context_desc.push_str(&format!("\n- Словарь терминов, формул и имен: {}", gloss.trim()));
+            }
+        }
+    }
+
+    let system_prompt = format!(
+        "Ты — высокоточный академический нейросетевой редактор-корректор стенограмм лекций (ASR Post-Correction).\n\
+        Твоя ЕДИНСТВЕННАЯ задача — исправить фонетические искажения, опечатки в распознавании редких научных терминов, \
+        аббревиатур и фамилий преподавателя на основе предоставленного академического контекста.\n\n\
+        АКТУАЛЬНЫЙ АКАДЕМИЧЕСКИЙ КОНТЕКСТ ЛЕКЦИИ:{}\n\n\
+        КАТЕГОРИЧЕСКИЕ И НЕЗЫБЛЕМЫЕ ПРАВИЛА:\n\
+        1. СОХРАНЯЙ 100% СЛОВ И ОБЪЕМА ИСХОДНОЙ РЕЧИ. Строго запрещено сокращать текст, убирать предложения, пересказывать, суммаризировать или добавлять собственные суждения.\n\
+        2. ИСПРАВЛЯЙ ТОЛЬКО ИСКАЖЕННЫЕ ТЕРМИНЫ, АББРЕВИАТУРЫ И ИМЕНА СОБСТВЕННЫЕ. Обычную речь лектора, связки и структуру сохраняй без изменений.\n\
+        3. СОХРАНЯЙ СТРУКТУРУ РАЗМЕТКИ. Если в тексте есть теги спикеров (например, [Спикер 1]:), метки времени или деление на абзацы, сохрани их в точности.\n\
+        4. СТРОГО ЗАПРЕЩЕНО ИСПОЛЬЗОВАТЬ ЭМОДЗИ И СМАЙЛИКИ.\n\
+        5. СТРОГО ЗАПРЕЩЕНО выводить теги <think>, <thought>, вводные слова («Вот исправленный текст:») или пояснения. Выводи ИСКЛЮЧИТЕЛЬНО выверенный текст лекции.",
+        if context_desc.is_empty() { " (Общая университетская лекция, научная терминология и академический стиль)" } else { &context_desc }
+    );
+
+    let candidate_models = [
+        "llama-3.3-70b-versatile",
+        "openai/gpt-oss-120b",
+        "qwen/qwen3.8-27b",
+        "llama-3.1-70b-versatile",
+        "openai/gpt-oss-20b",
+    ];
+
+    let corrected = if trimmed.len() <= 12000 {
+        correct_single_chunk(&client, api_key, &candidate_models, &system_prompt, trimmed)?
+    } else {
+        let mut chunks = Vec::new();
+        let mut current_chunk = String::new();
+
+        for paragraph in trimmed.split("\n\n") {
+            if current_chunk.len() + paragraph.len() > 8000 && !current_chunk.is_empty() {
+                chunks.push(current_chunk);
+                current_chunk = String::new();
+            }
+            if !current_chunk.is_empty() {
+                current_chunk.push_str("\n\n");
+            }
+            current_chunk.push_str(paragraph);
+        }
+        if !current_chunk.is_empty() {
+            chunks.push(current_chunk);
+        }
+
+        let total = chunks.len();
+        let mut full_result = String::new();
+        for (idx, chk) in chunks.iter().enumerate() {
+            if let Some(app_handle) = app {
+                app_handle.emit("transcription-log", format!("[ИИ-выверка] Обработка блока {}/{}...", idx + 1, total)).ok();
+            }
+            let part = match correct_single_chunk(&client, api_key, &candidate_models, &system_prompt, chk) {
+                Ok(res) => res,
+                Err(e) => {
+                    if let Some(app_handle) = app {
+                        app_handle.emit("transcription-log", format!("[ИИ-выверка] Предупреждение для блока {}: {}", idx + 1, e)).ok();
+                    }
+                    chk.to_string()
+                }
+            };
+            if !full_result.is_empty() {
+                full_result.push_str("\n\n");
+            }
+            full_result.push_str(&part);
+        }
+        full_result
+    };
+
+    if let Some(app_handle) = app {
+        app_handle.emit("transcription-log", "[ИИ-выверка] Выверка текста успешно завершена!").ok();
+    }
+
+    Ok(corrected)
 }
 
 fn prepare_lecture_text(full_text: &str, max_chars: usize) -> String {
@@ -872,5 +1109,23 @@ mod tests {
         let stray = "Here's a thinking process:\n1. Step\n\n# Реальный заголовок\nСодержание";
         let clean_stray = sanitize_summary(stray);
         assert_eq!(clean_stray, "# Реальный заголовок\nСодержание");
+    }
+
+    #[test]
+    fn test_transcription_context_defaults() {
+        let ctx = TranscriptionContext {
+            subject: Some("Основы компьютерных наук и ИИ".to_string()),
+            lecturer: Some("Профессор Смирнов".to_string()),
+            glossary: Some("мантисса, денормализованные числа, IEEE 754".to_string()),
+            enable_asr_correction: Some(true),
+        };
+
+        let json = serde_json::to_string(&ctx).expect("Serialization failed");
+        assert!(json.contains("Основы компьютерных наук"));
+        assert!(json.contains("Смирнов"));
+
+        let deserialized: TranscriptionContext = serde_json::from_str(&json).expect("Deserialization failed");
+        assert_eq!(deserialized.subject.as_deref(), Some("Основы компьютерных наук и ИИ"));
+        assert_eq!(deserialized.enable_asr_correction, Some(true));
     }
 }
